@@ -1,7 +1,5 @@
 .idea
 build
-test/*.js
-migrations/*.js
 node_modules/
 *.log
 *.map

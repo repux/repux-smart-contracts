@@ -1,17 +1,19 @@
 {
+  "name": "repux-smart-contracts",
+  "version": "0.0.1",
+  "description": "",
+  "main": "truffle.js",
   "scripts": {
-    "test": "tsc && truffle test",
-    "migrate": "tsc && truffle migrate"
+    "test": "truffle test",
+    "migrate": "truffle migrate"
   },
   "devDependencies": {
-    "@types/chai": "^4.0.8",
-    "@types/mocha": "^2.2.44",
+    "babel-polyfill": "^6.26.0",
+    "babel-register": "^6.26.0",
     "chai": "^4.1.2",
-    "mocha": "^4.0.1",
-    "typescript": "^2.6.2"
+    "mocha": "^4.0.1"
   },
   "dependencies": {
-    "@types/node": "^8.0.55",
     "truffle": "^4.0.1"
   }
 }

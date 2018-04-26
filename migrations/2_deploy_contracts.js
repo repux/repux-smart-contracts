@@ -1,7 +1,7 @@
 const DemoToken = artifacts.require('./DemoToken.sol');
 const Registry = artifacts.require('./Registry.sol');
 
-async function deploy(deployer) {
+async function deploy(deployer, network, accounts) {
     await deployer.deploy(DemoToken);
 
     await deployer.deploy(
@@ -10,6 +10,6 @@ async function deploy(deployer) {
     );
 }
 
-module.exports = function (deployer) {
-    deployer.then(() => deploy(deployer));
+module.exports = function (deployer, network, accounts) {
+    deployer.then(() => deploy(deployer, network, accounts));
 };
