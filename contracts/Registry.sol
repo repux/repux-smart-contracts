@@ -1,94 +1,117 @@
+pragma solidity 0.4.23;
+
 import "./SafeMath.sol";
 import "./ERC20.sol";
-import "./Ownable.sol";
 import "./DataProduct.sol";
+import "./Feeable.sol";
 
-contract Registry is Ownable {
-	using SafeMath for uint256;
-	address public tokenAddress;
-	address[] public dataProducts;
-	mapping (address => address[]) public dataCreated;
-	mapping (address => address[]) public dataPurchased;
-	mapping (address => bool) public isDataProduct;
-	event CreateDataProduct(address dataProduct, string ipfsHash);
-	event PurchaseDataProduct(address dataProduct, address buyer);
-	event RateDataProduct(address dataProduct, address rater, uint8 score);
-	event CancelRating(address dataProduct, address rater);
 
-	modifier onlyDataProduct {
-		require(isDataProduct[msg.sender]);
-		_;
-	}
+contract Registry is Feeable {
+    using SafeMath for uint256;
 
-	function Registry(address _tokenAddress) {
-		owner = msg.sender;
-		tokenAddress = _tokenAddress;
-	}
+    address public tokenAddress;
+    ERC20 private token;
 
-	function deleteDataProduct(address addr) public onlyOwner returns(bool) {
-		bool deleted = false;
-		uint256 deletedIndex = 0;
+    address[] public dataProducts;
+    mapping(address => address[]) public dataCreated;
+    mapping(address => address[]) public dataPurchased;
+    mapping(address => bool) public isDataProduct;
 
-		for (; deletedIndex<dataProducts.length; deletedIndex++) {
-			if (addr == dataProducts[deletedIndex]) {
-				deleted = true;
-				break;
-			}
-		}
+    uint256 public feesDeposit;
 
-		if (deleted) {
-			isDataProduct[addr] = false;
-			dataProducts[deletedIndex] = dataProducts[dataProducts.length.sub(1)];
-			delete dataProducts[dataProducts.length.sub(1)];
-			dataProducts.length = dataProducts.length.sub(1);
-			isDataProduct[addr] = false;
-		}
-		return deleted;
-	}
+    event CreateDataProduct(address dataProduct, string sellerMetaHash);
+    event PurchaseDataProduct(address dataProduct, address buyer);
+    event RateDataProduct(address dataProduct, address rater, uint8 score);
+    event CancelRating(address dataProduct, address rater);
+    event FeesDepositUpdate(address dataProduct, uint256 newFee);
 
-	function createDataProduct(string _name, string _description, 
-		string ipfsHash, string category, uint256 _price, uint256 size
-		) public returns(address){
-		address newDataProduct = new DataProduct(msg.sender, tokenAddress, _name, 
-			_description, ipfsHash, category, _price, size);
-		dataProducts.push(newDataProduct);
-		dataCreated[msg.sender].push(newDataProduct);
-		isDataProduct[newDataProduct] = true;
-		CreateDataProduct(newDataProduct, ipfsHash);
-		return newDataProduct;
-	}
+    modifier onlyDataProduct {
+        require(isDataProduct[msg.sender]);
+        _;
+    }
 
-	function registerUserPurchase(address user) public onlyDataProduct {
-		dataPurchased[user].push(msg.sender);
-		PurchaseDataProduct(msg.sender, user);
-	}
+    constructor(address _tokenAddress) public {
+        owner = msg.sender;
+        tokenAddress = _tokenAddress;
+        token = ERC20(tokenAddress);
+    }
 
-	function registerRating(address user, uint8 score) public onlyDataProduct {
-		RateDataProduct(msg.sender, user, score);
-	}
+    function withdraw() public onlyOwner {
+        uint256 balance = token.balanceOf(this);
 
-	function registerCancelRating(address user) public onlyDataProduct {
-		CancelRating(msg.sender, user);
-	}
+        require(balance > 0);
+        require(balance > feesDeposit);
 
-	function getDataProducts() public constant returns (address[]){
-		return dataProducts;
-	}
+        assert(token.transfer(owner, balance.sub(feesDeposit)));
+    }
 
-	function getDataCreatedFor(address addr) public constant returns (address[]) {
-		return dataCreated[addr];
-	}
+    function deleteDataProduct(address addr) public onlyOwner returns (bool) {
+        bool deleted = false;
+        uint256 deletedIndex = 0;
 
-	function getDataCreated() public constant returns (address[]) {
-		return getDataCreatedFor(msg.sender);
-	}
+        for (; deletedIndex < dataProducts.length; deletedIndex++) {
+            if (addr == dataProducts[deletedIndex]) {
+                deleted = true;
+                break;
+            }
+        }
 
-	function getDataPurchasedFor(address addr) public constant returns (address[]) {
-		return dataPurchased[addr];
-	}
+        if (deleted) {
+            isDataProduct[addr] = false;
+            dataProducts[deletedIndex] = dataProducts[dataProducts.length.sub(1)];
+            delete dataProducts[dataProducts.length.sub(1)];
+            dataProducts.length = dataProducts.length.sub(1);
+            isDataProduct[addr] = false;
+        }
 
-	function getDataPurchased() public constant returns (address[]) {
-		return getDataPurchasedFor(msg.sender);
-	}
+        return deleted;
+    }
 
+    function createDataProduct(string sellerMetaHash, uint256 _price) public returns (address) {
+        address newDataProduct = new DataProduct(msg.sender, tokenAddress, sellerMetaHash, _price);
+        dataProducts.push(newDataProduct);
+        dataCreated[msg.sender].push(newDataProduct);
+        isDataProduct[newDataProduct] = true;
+        emit CreateDataProduct(newDataProduct, sellerMetaHash);
+
+        return newDataProduct;
+    }
+
+    function setFeesDeposit(uint256 fee) public onlyDataProduct {
+        feesDeposit = fee;
+        emit FeesDepositUpdate(msg.sender, fee);
+    }
+
+    function registerUserPurchase(address user) public onlyDataProduct {
+        dataPurchased[user].push(msg.sender);
+        emit PurchaseDataProduct(msg.sender, user);
+    }
+
+    function registerRating(address user, uint8 score) public onlyDataProduct {
+        emit RateDataProduct(msg.sender, user, score);
+    }
+
+    function registerCancelRating(address user) public onlyDataProduct {
+        emit CancelRating(msg.sender, user);
+    }
+
+    function getDataProducts() public constant returns (address[]){
+        return dataProducts;
+    }
+
+    function getDataCreatedFor(address addr) public constant returns (address[]) {
+        return dataCreated[addr];
+    }
+
+    function getDataCreated() public constant returns (address[]) {
+        return getDataCreatedFor(msg.sender);
+    }
+
+    function getDataPurchasedFor(address addr) public constant returns (address[]) {
+        return dataPurchased[addr];
+    }
+
+    function getDataPurchased() public constant returns (address[]) {
+        return getDataPurchasedFor(msg.sender);
+    }
 }

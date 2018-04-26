@@ -1,200 +1,208 @@
+pragma solidity 0.4.23;
+
 import "./SafeMath.sol";
 import "./ERC20.sol";
 import "./Ownable.sol";
 import "./Registry.sol";
 
+
 contract DataProduct is Ownable {
-	using SafeMath for uint256;
-	address public registryAddress;
-	Registry public registry;
-	address public tokenAddress;
-	ERC20 private token;
-	string public name;
-	string public description;
-	string public ipfsHash;
-	string public category;
-	uint256 public price;
-	uint256 public size;
-	uint256 public creationTimeStamp;
-	mapping (address => bool) public ownership;
-	mapping (address => bool) public rated;
-	mapping (address => bool) public ratings;
-	uint256 public purchaseCount;
-	uint8 public minScore = 0;
-	uint8 public maxScore = 5;
-	mapping (uint8 => uint256) public scoreCount;
-	mapping (address => uint8) private userRatings;
-	mapping (address => bool) private userRated;
-	uint256 public rateCount;
-	uint256 private ownerDeposit;
-	event Purchase(address purchaser, address recipient);
-	event DataUpdate(string originalHash, string newHash);
-	event PriceUpdate(uint256 originalPrice, uint256 newPrice);
+    using SafeMath for uint256;
 
-	modifier onlyRegistry() {
-		require(msg.sender == registryAddress);
-		_;
-	}
+    struct Transaction {
+        address wallet;
+        string publicKey;
+        string secret;
+        string buyerMetaHash;
+        uint256 price;
+        uint256 fee;
+        bool purchased;
+        bool approved;
+        bool rated;
+        uint8 rating;
+    }
 
-	function DataProduct(address _owner, address _tokenAddress, string _name, 
-		string _description, string _ipfsHash, string _category, uint256 _price,
-		uint256 _size) public {
-		registryAddress = msg.sender;
-		registry = Registry(registryAddress);
-		owner = _owner;
-		ownership[owner] = true;
-		tokenAddress = _tokenAddress;
-		token = ERC20(tokenAddress);
-		name = _name;
-		description = _description;
-		ipfsHash = _ipfsHash;
-		category = _category;
-		price = _price;
-		size = _size;
-		creationTimeStamp = block.timestamp;
-	}
+    mapping(address => Transaction) transactions;
+    address[] buyersAddresses;
 
-	function ownerWithdraw(uint256 amount) public onlyOwner {
-		require(amount <= ownerDeposit);
-		ownerDeposit = ownerDeposit.sub(amount);
-		assert(token.transfer(owner, amount));
-	}
+    address public registryAddress;
+    Registry public registry;
 
-	function ownerWithdrawAll() public onlyOwner {
-		require(ownerDeposit > 0);
-		uint256 amount = ownerDeposit;
-		ownerDeposit = 0;
-		assert(token.transfer(owner, amount));
-	}
+    address public tokenAddress;
+    ERC20 private token;
 
-	function getOwnerDeposit() public constant onlyOwner returns(uint256) {
-		return ownerDeposit;
-	}
+    string public sellerMetaHash;
+    uint256 public price;
+    uint256 public creationTimeStamp;
+    uint8 public minScore = 0;
+    uint8 public maxScore = 5;
+    mapping(uint8 => uint256) public scoreCount;
+    uint256 public rateCount;
 
-	function setPrice(uint256 newPrice) public onlyOwner {
-		PriceUpdate(price, newPrice);
-		price = newPrice;		
-	}
+    uint256 public buyersDeposit;
 
-	function setSize(uint256 newSize) public onlyOwner {
-		size = newSize;
-	}
+    event Purchase(address payer, address buyer);
+    event PurchaseApproval(address payer, address buyer);
+    event SellerMetaHashUpdate(string originalHash, string newHash);
+    event PriceUpdate(uint256 originalPrice, uint256 newPrice);
 
-	function setName(string newName) public onlyOwner {
-		require(keccak256(newName) != keccak256(""));
-		name = newName;
-	}
+    modifier onlyRegistry() {
+        require(msg.sender == registryAddress);
+        _;
+    }
 
-	function setDescription(string newDescription) public onlyOwner {
-		description = newDescription;
-	}
+    modifier onlyApproved() {
+        require(transactions[msg.sender].approved);
+        _;
+    }
 
-	function setCategory(string newCategory) public onlyOwner {
-		category = newCategory;
-	}
+    constructor(address _owner, address _tokenAddress, string _sellerMetaHash, uint256 _price) public {
+        registryAddress = msg.sender;
+        registry = Registry(registryAddress);
 
-	function purchaseFor(address recipient) public {
-		require(!getOwnership(recipient));
-		ownership[recipient] = true;
-		assert(token.transferFrom(msg.sender, owner, price));
-		purchaseCount = purchaseCount.add(1);
-		Purchase(msg.sender, recipient);
-		registry.registerUserPurchase(recipient);
-	}
+        require(_price > registry.getTransactionFee(_price), "Price should be greater than transaction fee value");
 
-	function purchase() public {
-		purchaseFor(msg.sender);
-	}
+        owner = _owner;
+        tokenAddress = _tokenAddress;
+        token = ERC20(tokenAddress);
+        sellerMetaHash = _sellerMetaHash;
+        price = _price;
+        creationTimeStamp = block.timestamp;
+    }
 
-	function rate(uint8 score) public {
-		require(getOwnership(msg.sender));
-		require(score >= minScore && score <= maxScore);
-		if (userRated[msg.sender]) {
-			uint8 originalScore = userRatings[msg.sender];
-			require(score != originalScore);
-			scoreCount[originalScore] = scoreCount[originalScore].sub(1);
-		} else {
-			rateCount = rateCount.add(1);
-			userRated[msg.sender] = true;
-		}
-		scoreCount[score] = scoreCount[score].add(1);
-		userRatings[msg.sender] = score;
-		registry.registerRating(msg.sender, score);
-	}
+    function withdraw() public onlyOwner {
+        uint256 balance = token.balanceOf(this);
 
-	function cancelRating() public {
-		require(userRated[msg.sender]);
-		userRated[msg.sender] = false;
-		uint8 score = userRatings[msg.sender];
-		scoreCount[score] = scoreCount[score].sub(1);
-		userRatings[msg.sender] = 0;
-		rateCount = rateCount.sub(1);
-		registry.registerCancelRating(msg.sender);
-	}
+        require(balance > 0);
+        require(balance > buyersDeposit);
 
-	function setData(string _ipfsHash) public onlyOwner {
-		require(keccak256(_ipfsHash) != keccak256(""));
-		DataUpdate(ipfsHash, _ipfsHash);
-		ipfsHash = _ipfsHash;
-	}
+        assert(token.transfer(owner, balance.sub(buyersDeposit)));
+    }
 
-	
-	function getOwnership(address addr) public constant returns(bool) {
-		return ownership[addr];
-	}
-	
-	function getTotalRating() public constant returns(uint256) {
-		uint256 total = 0;
-		for (uint8 score=minScore; score<=maxScore; score++) {
-			total = total.add(scoreCount[score].mul(score));
-		}
-		return total;
-	}
+    function setPrice(uint256 newPrice) public onlyOwner {
+        require(newPrice > registry.getTransactionFee(newPrice), "Price should be greater than transaction fee value");
 
-	function getDataProductFor(address addr) public constant returns (
-		//address _this,
- 		address _owner,
- 		string _name, 
- 		string _description, 
- 		string _ipfsHash, 
- 		string _category,
- 		uint256 _price,
- 		uint256 _size,
- 		uint256 _totalRating,
- 		uint256 _rateCount,
- 		uint256 _purchaseCount,
- 		bool _ownership
- 	) {
- 		//_this = this;
- 		_owner = owner;
- 		_name = name;
- 		_description = description;
- 		_ipfsHash = ipfsHash;
- 		_category = category;
- 		_size = size;
- 		_price = price;
- 		_totalRating = getTotalRating();
- 		_rateCount = rateCount;
- 		_purchaseCount = purchaseCount;
- 		_ownership = getOwnership(addr);
-	}
+        emit PriceUpdate(price, newPrice);
+        price = newPrice;
+    }
 
-	function getDataProduct() public constant returns (
-		//address _this,
- 		address _owner,
- 		string _name, 
- 		string _description,  
- 		string _ipfsHash,
- 		string _category,
- 		uint256 _price,
- 		uint256 _size,
- 		uint256 _totalRating,
- 		uint256 _rateCount,
- 		uint256 _purchaseCount,
- 		bool _ownership
- 	) {
-		return getDataProductFor(msg.sender);
- 	}
-   
+    function purchaseFor(address buyerAddress, string buyerPublicKey) public {
+        require(owner != buyerAddress);
+        require(bytes(buyerPublicKey).length != 0);
 
+        Transaction storage transaction = transactions[buyerAddress];
+
+        require(!transactions[buyerAddress].purchased);
+
+        transaction.purchased = true;
+
+        uint256 fee = registry.getTransactionFee(price);
+
+        assert(token.transferFrom(msg.sender, this, price.sub(fee)));
+        assert(token.transferFrom(msg.sender, registryAddress, fee));
+
+        transaction.price = price;
+        transaction.fee = fee;
+        transaction.wallet = buyerAddress;
+        transaction.publicKey = buyerPublicKey;
+
+        buyersAddresses.push(buyerAddress);
+
+        buyersDeposit = buyersDeposit.add(price.sub(fee));
+        uint256 feesDeposit = registry.feesDeposit();
+        registry.setFeesDeposit(feesDeposit.add(fee));
+
+        emit Purchase(msg.sender, buyerAddress);
+        registry.registerUserPurchase(buyerAddress);
+    }
+
+    function purchase(string publicKey) public {
+        purchaseFor(msg.sender, publicKey);
+    }
+
+    function approve(address buyerAddress, string secret, string buyerMetaHash) public onlyOwner {
+        Transaction storage transaction = transactions[buyerAddress];
+
+        require(transaction.purchased);
+        require(!transaction.approved);
+        require(keccak256(buyerMetaHash) != keccak256(""));
+
+        transaction.approved = true;
+        transaction.secret = secret;
+        transaction.buyerMetaHash = buyerMetaHash;
+
+        buyersDeposit = buyersDeposit.sub(transaction.price.sub(transaction.fee));
+        uint256 feesDeposit = registry.feesDeposit();
+        registry.setFeesDeposit(feesDeposit.sub(transaction.fee));
+    }
+
+    function rate(uint8 score) public onlyApproved {
+        require(score >= minScore && score <= maxScore);
+
+        Transaction storage transaction = transactions[msg.sender];
+
+        if (transaction.rated) {
+            uint8 originalScore = transaction.rating;
+            require(score != originalScore);
+            scoreCount[originalScore] = scoreCount[originalScore].sub(1);
+        } else {
+            rateCount = rateCount.add(1);
+            transaction.rated = true;
+        }
+
+        scoreCount[score] = scoreCount[score].add(1);
+        transaction.rating = score;
+
+        registry.registerRating(msg.sender, score);
+    }
+
+    function cancelRating() public onlyApproved {
+        Transaction storage transaction = transactions[msg.sender];
+
+        require(transaction.rated);
+
+        transaction.rated = false;
+        uint8 score = transaction.rating;
+        scoreCount[score] = scoreCount[score].sub(1);
+        transaction.rating = 0;
+        rateCount = rateCount.sub(1);
+        registry.registerCancelRating(msg.sender);
+    }
+
+    function setSellerMetaHash(string _sellerMetaHash) public onlyOwner {
+        require(keccak256(_sellerMetaHash) != keccak256(""));
+
+        emit SellerMetaHashUpdate(sellerMetaHash, _sellerMetaHash);
+        sellerMetaHash = _sellerMetaHash;
+    }
+
+    function getTotalRating() public constant returns (uint256) {
+        uint256 total = 0;
+        for (uint8 score = minScore; score <= maxScore; score++) {
+            total = total.add(scoreCount[score].mul(score));
+        }
+        return total;
+    }
+
+    function getTransactionData(address buyerAddress) public view returns (
+        string _publicKey,
+        string _secret,
+        string _buyerMetaHash,
+        uint256 _price,
+        bool _purchased,
+        bool _approved,
+        bool _rated,
+        uint8 _rating
+    ) {
+        Transaction storage transaction = transactions[buyerAddress];
+
+        _publicKey = transaction.publicKey;
+        _secret = transaction.secret;
+        _buyerMetaHash = transaction.buyerMetaHash;
+        _price = transaction.price;
+        _purchased = transaction.purchased;
+        _approved = transaction.approved;
+        _rated = transaction.rated;
+        _rating = transaction.rating;
+    }
 }
