@@ -1,17 +1,29 @@
 {
   "name": "repux-smart-contracts",
   "version": "0.0.1",
-  "description": "",
+  "description": "RepuX smart contracts",
+  "author": "RepuX <support@repux.io>",
+  "license": "MIT",
   "main": "truffle.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/repux/repux-smart-contracts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/repux/repux-smart-contracts/issues"
+  },
   "scripts": {
     "test": "truffle test",
-    "migrate": "truffle migrate"
+    "migrate": "truffle migrate",
+    "release": "semantic-release"
   },
   "devDependencies": {
+    "@semantic-release/git": "^5.0.0",
     "babel-polyfill": "^6.26.0",
     "babel-register": "^6.26.0",
     "chai": "^4.1.2",
-    "mocha": "^4.0.1"
+    "mocha": "^4.0.1",
+    "semantic-release": "^15.4.0"
   },
   "dependencies": {
     "truffle": "^4.0.1"
