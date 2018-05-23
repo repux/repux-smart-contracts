@@ -1,4 +1,4 @@
-pragma solidity 0.4.23;
+pragma solidity 0.4.24;
 
 import "./SafeMath.sol";
 import "./ERC20.sol";
@@ -41,8 +41,6 @@ contract DataProduct is Ownable {
 
     uint256 public buyersDeposit;
 
-    event Purchase(address payer, address buyer);
-    event PurchaseApproval(address payer, address buyer);
     event SellerMetaHashUpdate(string originalHash, string newHash);
     event PriceUpdate(uint256 originalPrice, uint256 newPrice);
 
@@ -84,6 +82,7 @@ contract DataProduct is Ownable {
 
         emit PriceUpdate(price, newPrice);
         price = newPrice;
+        registry.registerUpdate();
     }
 
     function purchaseFor(address buyerAddress, string buyerPublicKey) public {
@@ -112,8 +111,7 @@ contract DataProduct is Ownable {
         uint256 feesDeposit = registry.feesDeposit();
         registry.setFeesDeposit(feesDeposit.add(fee));
 
-        emit Purchase(msg.sender, buyerAddress);
-        registry.registerUserPurchase(buyerAddress);
+        registry.registerPurchase(buyerAddress);
     }
 
     function purchase(string publicKey) public {
@@ -125,15 +123,18 @@ contract DataProduct is Ownable {
 
         require(transaction.purchased);
         require(!transaction.approved);
-        require(keccak256(buyerMetaHash) != keccak256(""));
+        require(keccak256(abi.encodePacked(buyerMetaHash)) != keccak256(abi.encodePacked("")));
 
         transaction.approved = true;
         transaction.secret = secret;
         transaction.buyerMetaHash = buyerMetaHash;
 
         buyersDeposit = buyersDeposit.sub(transaction.price.sub(transaction.fee));
+
         uint256 feesDeposit = registry.feesDeposit();
         registry.setFeesDeposit(feesDeposit.sub(transaction.fee));
+
+        registry.registerApprove(buyerAddress);
     }
 
     function rate(uint8 score) public onlyApproved {
@@ -153,7 +154,7 @@ contract DataProduct is Ownable {
         scoreCount[score] = scoreCount[score].add(1);
         transaction.rating = score;
 
-        registry.registerRating(msg.sender, score);
+        registry.registerRating();
     }
 
     function cancelRating() public onlyApproved {
@@ -166,11 +167,12 @@ contract DataProduct is Ownable {
         scoreCount[score] = scoreCount[score].sub(1);
         transaction.rating = 0;
         rateCount = rateCount.sub(1);
-        registry.registerCancelRating(msg.sender);
+
+        registry.registerCancelRating();
     }
 
     function setSellerMetaHash(string _sellerMetaHash) public onlyOwner {
-        require(keccak256(_sellerMetaHash) != keccak256(""));
+        require(keccak256(abi.encodePacked(_sellerMetaHash)) != keccak256(abi.encodePacked("")));
 
         emit SellerMetaHashUpdate(sellerMetaHash, _sellerMetaHash);
         sellerMetaHash = _sellerMetaHash;

@@ -1,4 +1,4 @@
-pragma solidity 0.4.23;
+pragma solidity 0.4.24;
 
 import "./SafeMath.sol";
 import "./ERC20.sol";
@@ -9,20 +9,20 @@ import "./Feeable.sol";
 contract Registry is Feeable {
     using SafeMath for uint256;
 
+    enum DataProductUpdateAction { CREATE, UPDATE, DELETE, PURCHASE, APPROVE, RATE, CANCEL_RATING }
+
     address public tokenAddress;
     ERC20 private token;
 
     address[] public dataProducts;
     mapping(address => address[]) public dataCreated;
     mapping(address => address[]) public dataPurchased;
+    mapping(address => address[]) public dataApproved;
     mapping(address => bool) public isDataProduct;
 
     uint256 public feesDeposit;
 
-    event CreateDataProduct(address dataProduct, string sellerMetaHash);
-    event PurchaseDataProduct(address dataProduct, address buyer);
-    event RateDataProduct(address dataProduct, address rater, uint8 score);
-    event CancelRating(address dataProduct, address rater);
+    event DataProductUpdate(address dataProduct, DataProductUpdateAction action);
     event FeesDepositUpdate(address dataProduct, uint256 newFee);
 
     modifier onlyDataProduct {
@@ -62,6 +62,8 @@ contract Registry is Feeable {
             delete dataProducts[dataProducts.length.sub(1)];
             dataProducts.length = dataProducts.length.sub(1);
             isDataProduct[addr] = false;
+
+            emit DataProductUpdate(addr, DataProductUpdateAction.DELETE);
         }
 
         return deleted;
@@ -72,46 +74,67 @@ contract Registry is Feeable {
         dataProducts.push(newDataProduct);
         dataCreated[msg.sender].push(newDataProduct);
         isDataProduct[newDataProduct] = true;
-        emit CreateDataProduct(newDataProduct, sellerMetaHash);
+
+        emit DataProductUpdate(newDataProduct, DataProductUpdateAction.CREATE);
 
         return newDataProduct;
     }
 
     function setFeesDeposit(uint256 fee) public onlyDataProduct {
         feesDeposit = fee;
+
         emit FeesDepositUpdate(msg.sender, fee);
     }
 
-    function registerUserPurchase(address user) public onlyDataProduct {
+    function registerPurchase(address user) public onlyDataProduct {
         dataPurchased[user].push(msg.sender);
-        emit PurchaseDataProduct(msg.sender, user);
+
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.PURCHASE);
     }
 
-    function registerRating(address user, uint8 score) public onlyDataProduct {
-        emit RateDataProduct(msg.sender, user, score);
+    function registerApprove(address user) public onlyDataProduct {
+        dataPurchased[user].push(msg.sender);
+
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.APPROVE);
     }
 
-    function registerCancelRating(address user) public onlyDataProduct {
-        emit CancelRating(msg.sender, user);
+    function registerUpdate() external onlyDataProduct {
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.UPDATE);
     }
 
-    function getDataProducts() public constant returns (address[]){
+    function registerRating() external onlyDataProduct {
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.RATE);
+    }
+
+    function registerCancelRating() external onlyDataProduct {
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.CANCEL_RATING);
+    }
+
+    function getDataProducts() public view returns (address[]){
         return dataProducts;
     }
 
-    function getDataCreatedFor(address addr) public constant returns (address[]) {
+    function getDataCreatedFor(address addr) public view returns (address[]) {
         return dataCreated[addr];
     }
 
-    function getDataCreated() public constant returns (address[]) {
+    function getDataCreated() public view returns (address[]) {
         return getDataCreatedFor(msg.sender);
     }
 
-    function getDataPurchasedFor(address addr) public constant returns (address[]) {
+    function getDataPurchasedFor(address addr) public view returns (address[]) {
         return dataPurchased[addr];
     }
 
-    function getDataPurchased() public constant returns (address[]) {
+    function getDataPurchased() public view returns (address[]) {
         return getDataPurchasedFor(msg.sender);
+    }
+
+    function getDataApprovedFor(address addr) public view returns (address[]) {
+        return dataApproved[addr];
+    }
+
+    function getDataApproved() public view returns (address[]) {
+        return getDataApprovedFor(msg.sender);
     }
 }
