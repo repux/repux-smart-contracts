@@ -96,9 +96,12 @@ contract DataProduct is Ownable {
         transaction.purchased = true;
 
         uint256 fee = registry.getTransactionFee(price);
+        uint256 priceWithoutFee = price.sub(fee);
 
-        assert(token.transferFrom(msg.sender, this, price.sub(fee)));
-        assert(token.transferFrom(msg.sender, registryAddress, fee));
+        assert(token.transferFrom(msg.sender, this, priceWithoutFee));
+        if (fee > 0) {
+            assert(token.transferFrom(msg.sender, registryAddress, fee));
+        }
 
         transaction.price = price;
         transaction.fee = fee;
@@ -107,9 +110,11 @@ contract DataProduct is Ownable {
 
         buyersAddresses.push(buyerAddress);
 
-        buyersDeposit = buyersDeposit.add(price.sub(fee));
-        uint256 feesDeposit = registry.feesDeposit();
-        registry.setFeesDeposit(feesDeposit.add(fee));
+        buyersDeposit = buyersDeposit.add(priceWithoutFee);
+        if (fee > 0) {
+            uint256 feesDeposit = registry.feesDeposit();
+            registry.setFeesDeposit(feesDeposit.add(fee));
+        }
 
         registry.registerPurchase(buyerAddress);
     }
