@@ -22,7 +22,7 @@ contract Registry is Feeable {
 
     uint256 public feesDeposit;
 
-    event DataProductUpdate(address dataProduct, DataProductUpdateAction action);
+    event DataProductUpdate(address dataProduct, DataProductUpdateAction action, address userAddress);
     event FeesDepositUpdate(address dataProduct, uint256 newFee);
 
     modifier onlyDataProduct {
@@ -63,7 +63,7 @@ contract Registry is Feeable {
             dataProducts.length = dataProducts.length.sub(1);
             isDataProduct[addr] = false;
 
-            emit DataProductUpdate(addr, DataProductUpdateAction.DELETE);
+            emit DataProductUpdate(addr, DataProductUpdateAction.DELETE, msg.sender);
         }
 
         return deleted;
@@ -75,7 +75,7 @@ contract Registry is Feeable {
         dataCreated[msg.sender].push(newDataProduct);
         isDataProduct[newDataProduct] = true;
 
-        emit DataProductUpdate(newDataProduct, DataProductUpdateAction.CREATE);
+        emit DataProductUpdate(newDataProduct, DataProductUpdateAction.CREATE, msg.sender);
 
         return newDataProduct;
     }
@@ -89,25 +89,25 @@ contract Registry is Feeable {
     function registerPurchase(address user) public onlyDataProduct {
         dataPurchased[user].push(msg.sender);
 
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.PURCHASE);
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.PURCHASE, user);
     }
 
     function registerApprove(address user) public onlyDataProduct {
-        dataPurchased[user].push(msg.sender);
+        dataApproved[user].push(msg.sender);
 
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.APPROVE);
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.APPROVE, user);
     }
 
-    function registerUpdate() external onlyDataProduct {
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.UPDATE);
+    function registerUpdate(address user) external onlyDataProduct {
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.UPDATE, user);
     }
 
-    function registerRating() external onlyDataProduct {
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.RATE);
+    function registerRating(address user) external onlyDataProduct {
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.RATE, user);
     }
 
-    function registerCancelRating() external onlyDataProduct {
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.CANCEL_RATING);
+    function registerCancelRating(address user) external onlyDataProduct {
+        emit DataProductUpdate(msg.sender, DataProductUpdateAction.CANCEL_RATING, user);
     }
 
     function getDataProducts() public view returns (address[]){
