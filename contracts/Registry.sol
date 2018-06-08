@@ -63,7 +63,7 @@ contract Registry is Feeable {
             dataProducts.length = dataProducts.length.sub(1);
             isDataProduct[addr] = false;
 
-            emit DataProductUpdate(addr, DataProductUpdateAction.DELETE, msg.sender);
+            emitDataProductUpdate(addr, DataProductUpdateAction.DELETE, msg.sender);
         }
 
         return deleted;
@@ -75,7 +75,7 @@ contract Registry is Feeable {
         dataCreated[msg.sender].push(newDataProduct);
         isDataProduct[newDataProduct] = true;
 
-        emit DataProductUpdate(newDataProduct, DataProductUpdateAction.CREATE, msg.sender);
+        emitDataProductUpdate(newDataProduct, DataProductUpdateAction.CREATE, msg.sender);
 
         return newDataProduct;
     }
@@ -89,25 +89,25 @@ contract Registry is Feeable {
     function registerPurchase(address user) public onlyDataProduct {
         dataPurchased[user].push(msg.sender);
 
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.PURCHASE, user);
+        emitDataProductUpdate(msg.sender, DataProductUpdateAction.PURCHASE, user);
     }
 
     function registerApprove(address user) public onlyDataProduct {
         dataApproved[user].push(msg.sender);
 
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.APPROVE, user);
+        emitDataProductUpdate(msg.sender, DataProductUpdateAction.APPROVE, user);
     }
 
     function registerUpdate(address user) external onlyDataProduct {
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.UPDATE, user);
+        emitDataProductUpdate(msg.sender, DataProductUpdateAction.UPDATE, user);
     }
 
     function registerRating(address user) external onlyDataProduct {
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.RATE, user);
+        emitDataProductUpdate(msg.sender, DataProductUpdateAction.RATE, user);
     }
 
     function registerCancelRating(address user) external onlyDataProduct {
-        emit DataProductUpdate(msg.sender, DataProductUpdateAction.CANCEL_RATING, user);
+        emitDataProductUpdate(msg.sender, DataProductUpdateAction.CANCEL_RATING, user);
     }
 
     function getDataProducts() public view returns (address[]){
@@ -136,5 +136,9 @@ contract Registry is Feeable {
 
     function getDataApproved() public view returns (address[]) {
         return getDataApprovedFor(msg.sender);
+    }
+
+    function emitDataProductUpdate(address dataProduct, DataProductUpdateAction action, address userAddress) public {
+        emit DataProductUpdate(dataProduct, action, userAddress);
     }
 }
