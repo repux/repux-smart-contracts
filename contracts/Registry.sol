@@ -9,7 +9,7 @@ import "./Feeable.sol";
 contract Registry is Feeable {
     using SafeMath for uint256;
 
-    enum DataProductUpdateAction { CREATE, UPDATE, DELETE, PURCHASE, APPROVE, RATE, CANCEL_RATING }
+    enum DataProductEventAction { CREATE, UPDATE, DELETE, PURCHASE, APPROVE, RATE, CANCEL_RATING }
 
     address public tokenAddress;
     ERC20 private token;
@@ -22,7 +22,7 @@ contract Registry is Feeable {
 
     uint256 public feesDeposit;
 
-    event DataProductUpdate(address dataProduct, DataProductUpdateAction action, address userAddress);
+    event DataProductUpdate(address dataProduct, DataProductEventAction action, address sender);
     event FeesDepositUpdate(address dataProduct, uint256 newFee);
 
     modifier onlyDataProduct {
@@ -63,7 +63,7 @@ contract Registry is Feeable {
             dataProducts.length = dataProducts.length.sub(1);
             isDataProduct[addr] = false;
 
-            emitDataProductUpdate(addr, DataProductUpdateAction.DELETE, msg.sender);
+            triggerDataProductUpdate(addr, DataProductEventAction.DELETE, msg.sender);
         }
 
         return deleted;
@@ -75,7 +75,7 @@ contract Registry is Feeable {
         dataCreated[msg.sender].push(newDataProduct);
         isDataProduct[newDataProduct] = true;
 
-        emitDataProductUpdate(newDataProduct, DataProductUpdateAction.CREATE, msg.sender);
+        triggerDataProductUpdate(newDataProduct, DataProductEventAction.CREATE, msg.sender);
 
         return newDataProduct;
     }
@@ -86,28 +86,28 @@ contract Registry is Feeable {
         emit FeesDepositUpdate(msg.sender, fee);
     }
 
-    function registerPurchase(address user) public onlyDataProduct {
-        dataPurchased[user].push(msg.sender);
+    function registerPurchase(address sender) public onlyDataProduct {
+        dataPurchased[sender].push(msg.sender);
 
-        emitDataProductUpdate(msg.sender, DataProductUpdateAction.PURCHASE, user);
+        triggerDataProductUpdate(msg.sender, DataProductEventAction.PURCHASE, sender);
     }
 
-    function registerApprove(address user) public onlyDataProduct {
-        dataApproved[user].push(msg.sender);
+    function registerApprove(address sender) public onlyDataProduct {
+        dataApproved[sender].push(msg.sender);
 
-        emitDataProductUpdate(msg.sender, DataProductUpdateAction.APPROVE, user);
+        triggerDataProductUpdate(msg.sender, DataProductEventAction.APPROVE, sender);
     }
 
-    function registerUpdate(address user) external onlyDataProduct {
-        emitDataProductUpdate(msg.sender, DataProductUpdateAction.UPDATE, user);
+    function registerUpdate(address sender) external onlyDataProduct {
+        triggerDataProductUpdate(msg.sender, DataProductEventAction.UPDATE, sender);
     }
 
-    function registerRating(address user) external onlyDataProduct {
-        emitDataProductUpdate(msg.sender, DataProductUpdateAction.RATE, user);
+    function registerRating(address sender) external onlyDataProduct {
+        triggerDataProductUpdate(msg.sender, DataProductEventAction.RATE, sender);
     }
 
-    function registerCancelRating(address user) external onlyDataProduct {
-        emitDataProductUpdate(msg.sender, DataProductUpdateAction.CANCEL_RATING, user);
+    function registerCancelRating(address sender) external onlyDataProduct {
+        triggerDataProductUpdate(msg.sender, DataProductEventAction.CANCEL_RATING, sender);
     }
 
     function getDataProducts() public view returns (address[]){
@@ -138,7 +138,7 @@ contract Registry is Feeable {
         return getDataApprovedFor(msg.sender);
     }
 
-    function emitDataProductUpdate(address dataProduct, DataProductUpdateAction action, address userAddress) public {
-        emit DataProductUpdate(dataProduct, action, userAddress);
+    function triggerDataProductUpdate(address dataProduct, DataProductEventAction action, address sender) internal {
+        emit DataProductUpdate(dataProduct, action, sender);
     }
 }
