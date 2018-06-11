@@ -40,9 +40,6 @@ contract DataProduct is Ownable {
 
     uint256 public buyersDeposit;
 
-    event SellerMetaHashUpdate(string originalHash, string newHash);
-    event PriceUpdate(uint256 originalPrice, uint256 newPrice);
-
     modifier onlyRegistry() {
         require(msg.sender == registryAddress);
         _;
@@ -79,7 +76,6 @@ contract DataProduct is Ownable {
     function setPrice(uint256 newPrice) public onlyOwner {
         require(newPrice > registry.getTransactionFee(newPrice), "Price should be greater than transaction fee value");
 
-        emit PriceUpdate(price, newPrice);
         price = newPrice;
         registry.registerUpdate(msg.sender);
     }
@@ -177,8 +173,8 @@ contract DataProduct is Ownable {
     function setSellerMetaHash(string _sellerMetaHash) public onlyOwner {
         require(keccak256(abi.encodePacked(_sellerMetaHash)) != keccak256(abi.encodePacked("")));
 
-        emit SellerMetaHashUpdate(sellerMetaHash, _sellerMetaHash);
         sellerMetaHash = _sellerMetaHash;
+        registry.registerUpdate(msg.sender);
     }
 
     function getTotalRating() public constant returns (uint256) {
