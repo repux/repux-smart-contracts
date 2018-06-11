@@ -12,7 +12,6 @@ contract DataProduct is Ownable {
     struct Transaction {
         address wallet;
         string publicKey;
-        string secret;
         string buyerMetaHash;
         uint256 price;
         uint256 fee;
@@ -40,9 +39,6 @@ contract DataProduct is Ownable {
     uint256 public rateCount;
 
     uint256 public buyersDeposit;
-
-    event SellerMetaHashUpdate(string originalHash, string newHash);
-    event PriceUpdate(uint256 originalPrice, uint256 newPrice);
 
     modifier onlyRegistry() {
         require(msg.sender == registryAddress);
@@ -80,9 +76,8 @@ contract DataProduct is Ownable {
     function setPrice(uint256 newPrice) public onlyOwner {
         require(newPrice > registry.getTransactionFee(newPrice), "Price should be greater than transaction fee value");
 
-        emit PriceUpdate(price, newPrice);
         price = newPrice;
-        registry.registerUpdate();
+        registry.registerUpdate(msg.sender);
     }
 
     function purchaseFor(address buyerAddress, string buyerPublicKey) public {
@@ -123,7 +118,7 @@ contract DataProduct is Ownable {
         purchaseFor(msg.sender, publicKey);
     }
 
-    function approve(address buyerAddress, string secret, string buyerMetaHash) public onlyOwner {
+    function approve(address buyerAddress, string buyerMetaHash) public onlyOwner {
         Transaction storage transaction = transactions[buyerAddress];
 
         require(transaction.purchased);
@@ -131,7 +126,6 @@ contract DataProduct is Ownable {
         require(keccak256(abi.encodePacked(buyerMetaHash)) != keccak256(abi.encodePacked("")));
 
         transaction.approved = true;
-        transaction.secret = secret;
         transaction.buyerMetaHash = buyerMetaHash;
 
         buyersDeposit = buyersDeposit.sub(transaction.price.sub(transaction.fee));
@@ -159,7 +153,7 @@ contract DataProduct is Ownable {
         scoreCount[score] = scoreCount[score].add(1);
         transaction.rating = score;
 
-        registry.registerRating();
+        registry.registerRating(msg.sender);
     }
 
     function cancelRating() public onlyApproved {
@@ -173,14 +167,14 @@ contract DataProduct is Ownable {
         transaction.rating = 0;
         rateCount = rateCount.sub(1);
 
-        registry.registerCancelRating();
+        registry.registerCancelRating(msg.sender);
     }
 
     function setSellerMetaHash(string _sellerMetaHash) public onlyOwner {
         require(keccak256(abi.encodePacked(_sellerMetaHash)) != keccak256(abi.encodePacked("")));
 
-        emit SellerMetaHashUpdate(sellerMetaHash, _sellerMetaHash);
         sellerMetaHash = _sellerMetaHash;
+        registry.registerUpdate(msg.sender);
     }
 
     function getTotalRating() public constant returns (uint256) {
@@ -193,7 +187,6 @@ contract DataProduct is Ownable {
 
     function getTransactionData(address buyerAddress) public view returns (
         string _publicKey,
-        string _secret,
         string _buyerMetaHash,
         uint256 _price,
         bool _purchased,
@@ -204,7 +197,6 @@ contract DataProduct is Ownable {
         Transaction storage transaction = transactions[buyerAddress];
 
         _publicKey = transaction.publicKey;
-        _secret = transaction.secret;
         _buyerMetaHash = transaction.buyerMetaHash;
         _price = transaction.price;
         _purchased = transaction.purchased;

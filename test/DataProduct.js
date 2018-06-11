@@ -17,7 +17,6 @@ contract('DataProduct', (accounts) => {
     const percentageFee = 3;
     const sellerMetaHash = 'sellerMetaHash';
     const publicKey = 'publicKey';
-    const secret = 'encryptedSecret';
     const buyerMetaHash = 'buyerMetaHash';
 
     before(async () => {
@@ -55,14 +54,13 @@ contract('DataProduct', (accounts) => {
         (await repux.balanceOf.call(registry.address)).toNumber().should.equal(fee);
         (await repux.balanceOf.call(buyer)).toNumber().should.equal((buyerBalance - price));
 
-        await dataProduct.approve(buyer, secret, buyerMetaHash);
+        await dataProduct.approve(buyer, buyerMetaHash);
 
         const data = await dataProduct.getTransactionData.call(buyer);
         data[0].should.equal(publicKey);
-        data[1].should.equal(secret);
-        data[2].should.equal(buyerMetaHash);
-        data[4].should.equal(true, 'Is purchased');
-        data[5].should.equal(true, 'Is approved');
+        data[1].should.equal(buyerMetaHash);
+        data[3].should.equal(true, 'Is purchased');
+        data[4].should.equal(true, 'Is approved');
         (await dataProduct.buyersDeposit.call()).toNumber().should.equal(0);
         (await registry.feesDeposit.call()).toNumber().should.equal(0);
 
@@ -87,8 +85,8 @@ contract('DataProduct', (accounts) => {
 
         const data = await dataProduct.getTransactionData.call(buyer);
         data[0].should.equal(publicKey);
-        data[4].should.equal(true, 'Is purchased');
-        data[5].should.equal(false, 'Is approved');
+        data[3].should.equal(true, 'Is purchased');
+        data[4].should.equal(false, 'Is approved');
 
         expectThrow(dataProduct.withdraw());
 
