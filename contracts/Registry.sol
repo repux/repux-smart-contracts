@@ -2,7 +2,7 @@ pragma solidity 0.4.24;
 
 import "./SafeMath.sol";
 import "./ERC20.sol";
-import "./DataProduct.sol";
+import "./DataProductFactoryInterface.sol";
 import "./Feeable.sol";
 
 
@@ -13,6 +13,9 @@ contract Registry is Feeable {
 
     address public tokenAddress;
     ERC20 private token;
+
+    address public dataProductFactoryAddress;
+    DataProductFactoryInterface private dataProductFactory;
 
     address[] public dataProducts;
     mapping(address => address[]) public dataCreated;
@@ -30,10 +33,12 @@ contract Registry is Feeable {
         _;
     }
 
-    constructor(address _tokenAddress) public {
+    constructor(address _tokenAddress, address _dataProductFactoryAddress) public {
         owner = msg.sender;
         tokenAddress = _tokenAddress;
         token = ERC20(tokenAddress);
+        dataProductFactoryAddress = _dataProductFactoryAddress;
+        dataProductFactory = DataProductFactoryInterface(dataProductFactoryAddress);
     }
 
     function withdraw() public onlyOwner {
@@ -69,8 +74,8 @@ contract Registry is Feeable {
         return deleted;
     }
 
-    function createDataProduct(string sellerMetaHash, uint256 _price) public returns (address) {
-        address newDataProduct = new DataProduct(msg.sender, tokenAddress, sellerMetaHash, _price);
+    function createDataProduct(string _sellerMetaHash, uint256 _price) public returns (address) {
+        address newDataProduct = dataProductFactory.createDataProduct(msg.sender, tokenAddress, _sellerMetaHash, _price);
         dataProducts.push(newDataProduct);
         dataCreated[msg.sender].push(newDataProduct);
         isDataProduct[newDataProduct] = true;

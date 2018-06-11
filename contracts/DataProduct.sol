@@ -50,8 +50,16 @@ contract DataProduct is Ownable {
         _;
     }
 
-    constructor(address _owner, address _tokenAddress, string _sellerMetaHash, uint256 _price) public {
-        registryAddress = msg.sender;
+    constructor(
+        address _registryAddress,
+        address _owner,
+        address _tokenAddress,
+        string _sellerMetaHash,
+        uint256 _price
+    )
+        public
+    {
+        registryAddress = _registryAddress;
         registry = Registry(registryAddress);
 
         require(_price > registry.getTransactionFee(_price), "Price should be greater than transaction fee value");
