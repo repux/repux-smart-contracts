@@ -55,13 +55,13 @@ contract('DataProduct', (accounts) => {
         (await repux.balanceOf.call(registry.address)).toNumber().should.equal(fee);
         (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - price));
 
-        await dataProduct.approve(firstBuyer, buyerMetaHash);
+        await dataProduct.finalise(firstBuyer, buyerMetaHash);
 
         const data = await dataProduct.getTransactionData.call(firstBuyer);
         data[0].should.equal(publicKey);
         data[1].should.equal(buyerMetaHash);
         data[3].should.equal(true, 'Is purchased');
-        data[4].should.equal(true, 'Is approved');
+        data[4].should.equal(true, 'Is finalised');
         (await dataProduct.buyersDeposit.call()).toNumber().should.equal(0);
         (await registry.feesDeposit.call()).toNumber().should.equal(0);
 
@@ -77,7 +77,7 @@ contract('DataProduct', (accounts) => {
         (await repux.balanceOf.call(seller)).toNumber().should.equal((sellerBalance + price));
     });
 
-    it('should forbid withdraw of unapproved transaction', async () => {
+    it('should forbid withdraw of unfinalised transaction', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
@@ -87,7 +87,7 @@ contract('DataProduct', (accounts) => {
         const data = await dataProduct.getTransactionData.call(firstBuyer);
         data[0].should.equal(publicKey);
         data[3].should.equal(true, 'Is purchased');
-        data[4].should.equal(false, 'Is approved');
+        data[4].should.equal(false, 'Is finalised');
 
         expectThrow(dataProduct.withdraw());
 

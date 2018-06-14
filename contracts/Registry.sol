@@ -9,7 +9,7 @@ import "./Feeable.sol";
 contract Registry is Feeable {
     using SafeMath for uint256;
 
-    enum DataProductEventAction { CREATE, UPDATE, DELETE, PURCHASE, APPROVE, RATE, CANCEL_RATING }
+    enum DataProductEventAction { CREATE, UPDATE, DELETE, PURCHASE, CANCEL_PURCHASE, FINALISE, RATE, CANCEL_RATING }
 
     address public tokenAddress;
     ERC20 private token;
@@ -20,13 +20,10 @@ contract Registry is Feeable {
     address[] public dataProducts;
     mapping(address => address[]) public dataCreated;
     mapping(address => address[]) public dataPurchased;
-    mapping(address => address[]) public dataApproved;
+    mapping(address => address[]) public dataFinalised;
     mapping(address => bool) public isDataProduct;
 
-    uint256 public feesDeposit;
-
     event DataProductUpdate(address dataProduct, DataProductEventAction action, address sender);
-    event FeesDepositUpdate(address dataProduct, uint256 newFee);
 
     modifier onlyDataProduct {
         require(isDataProduct[msg.sender]);
@@ -50,9 +47,8 @@ contract Registry is Feeable {
         uint256 balance = token.balanceOf(this);
 
         require(balance > 0);
-        require(balance > feesDeposit);
 
-        assert(token.transfer(owner, balance.sub(feesDeposit)));
+        assert(token.transfer(owner, balance));
     }
 
     function deleteDataProduct(address _address) public onlyOwnerOrDataProduct returns (bool) {
@@ -73,9 +69,7 @@ contract Registry is Feeable {
         if (deleted) {
             isDataProduct[_address] = false;
             dataProducts[deletedIndex] = dataProducts[dataProducts.length.sub(1)];
-            delete dataProducts[dataProducts.length.sub(1)];
             dataProducts.length = dataProducts.length.sub(1);
-            isDataProduct[_address] = false;
 
             triggerDataProductUpdate(_address, DataProductEventAction.DELETE, msg.sender);
         }
@@ -94,22 +88,22 @@ contract Registry is Feeable {
         return newDataProduct;
     }
 
-    function setFeesDeposit(uint256 fee) public onlyDataProduct {
-        feesDeposit = fee;
-
-        emit FeesDepositUpdate(msg.sender, fee);
-    }
-
     function registerPurchase(address sender) public onlyDataProduct {
         dataPurchased[sender].push(msg.sender);
 
         triggerDataProductUpdate(msg.sender, DataProductEventAction.PURCHASE, sender);
     }
 
-    function registerApprove(address sender) public onlyDataProduct {
-        dataApproved[sender].push(msg.sender);
+    function registerCancelPurchase(address sender) public onlyDataProduct {
+        dataPurchased[sender].push(msg.sender);
 
-        triggerDataProductUpdate(msg.sender, DataProductEventAction.APPROVE, sender);
+        triggerDataProductUpdate(msg.sender, DataProductEventAction.CANCEL_PURCHASE, sender);
+    }
+
+    function registerFinalise(address sender) public onlyDataProduct {
+        dataFinalised[sender].push(msg.sender);
+
+        triggerDataProductUpdate(msg.sender, DataProductEventAction.FINALISE, sender);
     }
 
     function registerUpdate(address sender) external onlyDataProduct {
@@ -144,12 +138,12 @@ contract Registry is Feeable {
         return getDataPurchasedFor(msg.sender);
     }
 
-    function getDataApprovedFor(address _address) public view returns (address[]) {
-        return dataApproved[_address];
+    function getDataFinalisedFor(address _address) public view returns (address[]) {
+        return dataFinalised[_address];
     }
 
-    function getDataApproved() public view returns (address[]) {
-        return getDataApprovedFor(msg.sender);
+    function getDataFinalised() public view returns (address[]) {
+        return getDataFinalisedFor(msg.sender);
     }
 
     function triggerDataProductUpdate(address dataProduct, DataProductEventAction action, address sender) internal {
