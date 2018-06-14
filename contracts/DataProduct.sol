@@ -22,7 +22,7 @@ contract DataProduct is Ownable {
     }
 
     mapping(address => Transaction) transactions;
-    address[] buyersAddresses;
+    address[] private buyersAddresses;
 
     address public registryAddress;
     Registry public registry;
@@ -191,6 +191,10 @@ contract DataProduct is Ownable {
             total = total.add(scoreCount[score].mul(score));
         }
         return total;
+    }
+
+    function getBuyersAddresses() public view returns (address[]) {
+        return buyersAddresses;
     }
 
     function getTransactionData(address buyerAddress) public view returns (
