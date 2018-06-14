@@ -13,10 +13,11 @@ contract DataProduct is Ownable {
         address wallet;
         string publicKey;
         string buyerMetaHash;
+        uint256 deliveryDeadline;
         uint256 price;
         uint256 fee;
         bool purchased;
-        bool approved;
+        bool finalised;
         bool rated;
         uint8 rating;
     }
@@ -33,6 +34,7 @@ contract DataProduct is Ownable {
     string public sellerMetaHash;
     uint256 public price;
     uint256 public creationTimeStamp;
+    uint8 public daysForDeliver;
     uint8 public minScore = 0;
     uint8 public maxScore = 5;
     mapping(uint8 => uint256) public scoreCount;
@@ -47,8 +49,13 @@ contract DataProduct is Ownable {
         _;
     }
 
-    modifier onlyApproved() {
-        require(transactions[msg.sender].approved);
+    modifier onlyBuyer() {
+        require(transactions[msg.sender].wallet != address(0));
+        _;
+    }
+
+    modifier onlyFinalised() {
+        require(transactions[msg.sender].finalised);
         _;
     }
 
@@ -62,7 +69,8 @@ contract DataProduct is Ownable {
         address _owner,
         address _tokenAddress,
         string _sellerMetaHash,
-        uint256 _price
+        uint256 _price,
+        uint8 _daysForDeliver
     )
         public
     {
@@ -76,7 +84,8 @@ contract DataProduct is Ownable {
         token = ERC20(tokenAddress);
         sellerMetaHash = _sellerMetaHash;
         price = _price;
-        creationTimeStamp = block.timestamp;
+        daysForDeliver = _daysForDeliver;
+        creationTimeStamp = now;
     }
 
     function disable() public onlyOwner onlyEnabled {
@@ -94,8 +103,7 @@ contract DataProduct is Ownable {
     function withdraw() public onlyOwner {
         uint256 balance = token.balanceOf(this);
 
-        require(balance > 0);
-        require(balance > buyersDeposit);
+        require(balance > 0 && balance > buyersDeposit);
 
         assert(token.transfer(owner, balance.sub(buyersDeposit)));
 
@@ -116,30 +124,23 @@ contract DataProduct is Ownable {
 
         Transaction storage transaction = transactions[buyerAddress];
 
-        require(!transactions[buyerAddress].purchased);
+        require(!transaction.purchased);
 
         transaction.purchased = true;
 
         uint256 fee = registry.getTransactionFee(price);
-        uint256 priceWithoutFee = price.sub(fee);
-
-        assert(token.transferFrom(msg.sender, this, priceWithoutFee));
-        if (fee > 0) {
-            assert(token.transferFrom(msg.sender, registryAddress, fee));
-        }
 
         transaction.price = price;
         transaction.fee = fee;
         transaction.wallet = buyerAddress;
         transaction.publicKey = buyerPublicKey;
+        transaction.deliveryDeadline = now + daysForDeliver * 1 days;
 
         buyersAddresses.push(buyerAddress);
 
-        buyersDeposit = buyersDeposit.add(priceWithoutFee);
-        if (fee > 0) {
-            uint256 feesDeposit = registry.feesDeposit();
-            registry.setFeesDeposit(feesDeposit.add(fee));
-        }
+        assert(token.transferFrom(msg.sender, this, price));
+
+        buyersDeposit = buyersDeposit.add(price);
 
         registry.registerPurchase(buyerAddress);
     }
@@ -148,25 +149,62 @@ contract DataProduct is Ownable {
         purchaseFor(msg.sender, publicKey);
     }
 
-    function approve(address buyerAddress, string buyerMetaHash) public onlyOwner onlyEnabled {
-        Transaction storage transaction = transactions[buyerAddress];
+    function cancelPurchase() public onlyBuyer {
+        Transaction storage transaction = transactions[msg.sender];
 
-        require(transaction.purchased);
-        require(!transaction.approved);
-        require(keccak256(abi.encodePacked(buyerMetaHash)) != keccak256(abi.encodePacked("")));
+        require(transaction.purchased && now >= transaction.deliveryDeadline);
 
-        transaction.approved = true;
-        transaction.buyerMetaHash = buyerMetaHash;
+        uint256 fee = transaction.fee;
+        uint256 priceWithoutFee = transaction.price.sub(fee);
 
-        buyersDeposit = buyersDeposit.sub(transaction.price.sub(transaction.fee));
+        assert(deleteTransaction());
+        assert(token.transfer(msg.sender, transaction.price));
 
-        uint256 feesDeposit = registry.feesDeposit();
-        registry.setFeesDeposit(feesDeposit.sub(transaction.fee));
+        buyersDeposit = buyersDeposit.sub(transaction.price);
 
-        registry.registerApprove(buyerAddress);
+        registry.registerCancelPurchase(msg.sender);
     }
 
-    function rate(uint8 score) public onlyApproved onlyEnabled {
+    function deleteTransaction() private returns (bool) {
+        bool deleted = false;
+        uint256 deletedIndex = 0;
+
+        for (; deletedIndex < buyersAddresses.length; deletedIndex++) {
+            if (msg.sender == buyersAddresses[deletedIndex]) {
+                deleted = true;
+                break;
+            }
+        }
+
+        if (deleted) {
+            delete transactions[msg.sender];
+
+            buyersAddresses[deletedIndex] = buyersAddresses[buyersAddresses.length.sub(1)];
+            buyersAddresses.length = buyersAddresses.length.sub(1);
+        }
+
+        return deleted;
+    }
+
+    function finalise(address buyerAddress, string buyerMetaHash) public onlyOwner onlyEnabled {
+        Transaction storage transaction = transactions[buyerAddress];
+
+        require(transaction.purchased && !transaction.finalised);
+        require(keccak256(abi.encodePacked(buyerMetaHash)) != keccak256(abi.encodePacked("")));
+
+        transaction.finalised = true;
+        transaction.buyerMetaHash = buyerMetaHash;
+
+        if (transaction.fee > 0) {
+            assert(token.transfer(registryAddress, transaction.fee));
+        }
+
+        buyersDeposit = buyersDeposit.sub(transaction.price);
+
+        registry.registerFinalise(buyerAddress);
+    }
+
+    function rate(uint8 score) public onlyFinalised onlyEnabled {
         require(score >= minScore && score <= maxScore);
 
         Transaction storage transaction = transactions[msg.sender];
@@ -186,7 +224,7 @@ contract DataProduct is Ownable {
         registry.registerRating(msg.sender);
     }
 
-    function cancelRating() public onlyApproved onlyEnabled {
+    function cancelRating() public onlyFinalised onlyEnabled {
         Transaction storage transaction = transactions[msg.sender];
 
         require(transaction.rated);
@@ -227,7 +265,7 @@ contract DataProduct is Ownable {
         string _buyerMetaHash,
         uint256 _price,
         bool _purchased,
-        bool _approved,
+        bool _finalised,
         bool _rated,
         uint8 _rating
     ) {
@@ -237,7 +275,7 @@ contract DataProduct is Ownable {
         _buyerMetaHash = transaction.buyerMetaHash;
         _price = transaction.price;
         _purchased = transaction.purchased;
-        _approved = transaction.approved;
+        _finalised = transaction.finalised;
         _rated = transaction.rated;
         _rating = transaction.rating;
     }
