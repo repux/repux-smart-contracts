@@ -1,5 +1,6 @@
 pragma solidity 0.4.24;
 
+import "./AddressArrayRemover.sol";
 import "./SafeMath.sol";
 import "./ERC20.sol";
 import "./Ownable.sol";
@@ -7,6 +8,7 @@ import "./Registry.sol";
 
 
 contract DataProduct is Ownable {
+    using AddressArrayRemover for address[];
     using SafeMath for uint256;
 
     struct Transaction {
@@ -152,38 +154,22 @@ contract DataProduct is Ownable {
     function cancelPurchase() public onlyBuyer {
         Transaction storage transaction = transactions[msg.sender];
 
-        require(transaction.purchased && now >= transaction.deliveryDeadline);
+        require(transaction.purchased && !transaction.finalised && now >= transaction.deliveryDeadline);
 
-        uint256 fee = transaction.fee;
-        uint256 priceWithoutFee = transaction.price.sub(fee);
+        uint256 transactionPrice = transaction.price;
 
-        assert(deleteTransaction());
-        assert(token.transfer(msg.sender, transaction.price));
+        deleteTransaction();
+        assert(token.transfer(msg.sender, transactionPrice));
 
-        buyersDeposit = buyersDeposit.sub(transaction.price);
+        buyersDeposit = buyersDeposit.sub(transactionPrice);
 
         registry.registerCancelPurchase(msg.sender);
     }
 
-    function deleteTransaction() private returns (bool) {
-        bool deleted = false;
-        uint256 deletedIndex = 0;
+    function deleteTransaction() private {
+        buyersAddresses.removeByValue(msg.sender);
 
-        for (; deletedIndex < buyersAddresses.length; deletedIndex++) {
-            if (msg.sender == buyersAddresses[deletedIndex]) {
-                deleted = true;
-                break;
-            }
-        }
-
-        if (deleted) {
-            delete transactions[msg.sender];
-
-            buyersAddresses[deletedIndex] = buyersAddresses[buyersAddresses.length.sub(1)];
-            buyersAddresses.length = buyersAddresses.length.sub(1);
-        }
-
-        return deleted;
+        delete transactions[msg.sender];
     }
 
     function finalise(address buyerAddress, string buyerMetaHash) public onlyOwner onlyEnabled {
@@ -246,6 +232,14 @@ contract DataProduct is Ownable {
         registry.registerUpdate(msg.sender);
     }
 
+    function setDaysForDeliver(uint8 _daysForDeliver) public onlyOwner onlyEnabled {
+        require(keccak256(abi.encodePacked(_daysForDeliver)) != keccak256(abi.encodePacked("")));
+
+        daysForDeliver = _daysForDeliver;
+
+        registry.registerUpdate(msg.sender);
+    }
+
     function getTotalRating() public constant returns (uint256) {
         uint256 total = 0;
 
@@ -263,7 +257,9 @@ contract DataProduct is Ownable {
     function getTransactionData(address buyerAddress) public view returns (
         string _publicKey,
         string _buyerMetaHash,
+        uint256 _deliveryDeadline,
         uint256 _price,
+        uint256 _fee,
         bool _purchased,
         bool _finalised,
         bool _rated,
@@ -273,7 +269,9 @@ contract DataProduct is Ownable {
 
         _publicKey = transaction.publicKey;
         _buyerMetaHash = transaction.buyerMetaHash;
+        _deliveryDeadline = transaction.deliveryDeadline;
         _price = transaction.price;
+        _fee = transaction.fee;
         _purchased = transaction.purchased;
         _finalised = transaction.finalised;
         _rated = transaction.rated;

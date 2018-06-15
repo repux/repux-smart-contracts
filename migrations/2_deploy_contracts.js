@@ -1,16 +1,24 @@
+const AddressArrayRemover = artifacts.require('./AddressArrayRemover.sol');
 const DemoToken = artifacts.require('./DemoToken.sol');
 const DataProductFactory = artifacts.require('./DataProductFactory.sol');
 const Registry = artifacts.require('./Registry.sol');
 
 async function deploy(deployer, network, accounts) {
+    let dataProductFactory;
+
+    await deployer.deploy(AddressArrayRemover);
+    await deployer.link(AddressArrayRemover, [Registry, DataProductFactory]);
+
     await deployer.deploy(DemoToken);
-    await deployer.deploy(DataProductFactory);
+    dataProductFactory = await deployer.deploy(DataProductFactory);
 
     await deployer.deploy(
         Registry,
         DemoToken.address,
         DataProductFactory.address
     );
+
+    await dataProductFactory.setRegistry(Registry.address);
 }
 
 module.exports = (deployer, network, accounts) => {

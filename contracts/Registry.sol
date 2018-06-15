@@ -1,5 +1,6 @@
 pragma solidity 0.4.24;
 
+import "./AddressArrayRemover.sol";
 import "./SafeMath.sol";
 import "./ERC20.sol";
 import "./DataProductFactoryInterface.sol";
@@ -7,6 +8,7 @@ import "./Feeable.sol";
 
 
 contract Registry is Feeable {
+    using AddressArrayRemover for address[];
     using SafeMath for uint256;
 
     enum DataProductEventAction { CREATE, UPDATE, DELETE, PURCHASE, CANCEL_PURCHASE, FINALISE, RATE, CANCEL_RATING }
@@ -54,31 +56,24 @@ contract Registry is Feeable {
     function deleteDataProduct(address _address) public onlyOwnerOrDataProduct returns (bool) {
         uint256 dataProductBalance = token.balanceOf(_address);
 
-        require(dataProductBalance == 0);
+        require(dataProductBalance == 0, "Can not delete Data Product which holds the funds");
 
-        bool deleted = false;
-        uint256 deletedIndex = 0;
+        dataProducts.removeByValue(_address);
+        isDataProduct[_address] = false;
 
-        for (; deletedIndex < dataProducts.length; deletedIndex++) {
-            if (_address == dataProducts[deletedIndex]) {
-                deleted = true;
-                break;
-            }
-        }
+        triggerDataProductUpdate(_address, DataProductEventAction.DELETE, msg.sender);
 
-        if (deleted) {
-            isDataProduct[_address] = false;
-            dataProducts[deletedIndex] = dataProducts[dataProducts.length.sub(1)];
-            dataProducts.length = dataProducts.length.sub(1);
-
-            triggerDataProductUpdate(_address, DataProductEventAction.DELETE, msg.sender);
-        }
-
-        return deleted;
+        return true;
     }
 
-    function createDataProduct(string _sellerMetaHash, uint256 _price) public returns (address) {
-        address newDataProduct = dataProductFactory.createDataProduct(msg.sender, tokenAddress, _sellerMetaHash, _price);
+    function createDataProduct(string _sellerMetaHash, uint256 _price, uint8 _daysForDeliver) public returns (address) {
+        address newDataProduct = dataProductFactory.createDataProduct(
+            msg.sender,
+            tokenAddress,
+            _sellerMetaHash,
+            _price,
+            _daysForDeliver
+        );
         dataProducts.push(newDataProduct);
         dataCreated[msg.sender].push(newDataProduct);
         isDataProduct[newDataProduct] = true;
@@ -95,7 +90,7 @@ contract Registry is Feeable {
     }
 
     function registerCancelPurchase(address sender) public onlyDataProduct {
-        dataPurchased[sender].push(msg.sender);
+        dataPurchased[sender].removeByValue(msg.sender);
 
         triggerDataProductUpdate(msg.sender, DataProductEventAction.CANCEL_PURCHASE, sender);
     }
