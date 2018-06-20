@@ -13,14 +13,13 @@ async function deploy(deployer, network, accounts) {
     );
 }
 
-module.exports = function (deployer, network, accounts) {
-    deployer.then(() => {
-        if (network === 'rinkeby') {
-            deployer.deploy(Registry, '0xfa19d4e302336d61b895ea3b26bf4864bdd1d8ab');
+module.exports = (deployer, network, accounts) => {
+    deployer.then(async () => {
+            if (network === 'rinkeby') {
+                await deployer.deploy(Registry, '0xfa19d4e302336d61b895ea3b26bf4864bdd1d8ab');
+            } else {
+                await deploy(deployer, network, accounts);
+            }
         }
-        else {
-            deploy(deployer, network, accounts)
-        }
-    }
     );
 };
