@@ -9,7 +9,8 @@ contract('DataProduct', (accounts) => {
     let registry, repux, sellerBalance, fee;
 
     const seller = accounts[0];
-    const buyer = accounts[1];
+    const firstBuyer = accounts[1];
+    const secondBuyer = accounts[2];
     const buyerBalance = 1000000;
     const price = 123;
     const toLowPrice = 2;
@@ -24,9 +25,9 @@ contract('DataProduct', (accounts) => {
         repux = await RepuX.deployed();
         sellerBalance = (await repux.balanceOf.call(seller)).toNumber();
 
-        repux.issue(buyer, buyerBalance);
+        repux.issue(firstBuyer, buyerBalance);
 
-        (await repux.balanceOf.call(buyer)).toNumber().should.equal(buyerBalance);
+        (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal(buyerBalance);
 
         await registry.proposeNewFeeAdmin(seller);
         await registry.acceptFeeAdminTransfer();
@@ -41,22 +42,22 @@ contract('DataProduct', (accounts) => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
-        await repux.approve(dataProduct.address, price, { from: buyer });
+        await repux.approve(dataProduct.address, price, { from: firstBuyer });
 
-        (await repux.allowance.call(buyer, dataProduct.address)).toNumber().should.equal(price);
+        (await repux.allowance.call(firstBuyer, dataProduct.address)).toNumber().should.equal(price);
 
-        await dataProduct.purchase(publicKey, { from: buyer });
+        await dataProduct.purchase(publicKey, { from: firstBuyer });
 
         (await dataProduct.buyersDeposit.call()).toNumber().should.equal((price - fee));
         (await registry.feesDeposit.call()).toNumber().should.equal(fee);
 
         (await repux.balanceOf.call(dataProduct.address)).toNumber().should.equal((price - fee));
         (await repux.balanceOf.call(registry.address)).toNumber().should.equal(fee);
-        (await repux.balanceOf.call(buyer)).toNumber().should.equal((buyerBalance - price));
+        (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - price));
 
-        await dataProduct.approve(buyer, buyerMetaHash);
+        await dataProduct.approve(firstBuyer, buyerMetaHash);
 
-        const data = await dataProduct.getTransactionData.call(buyer);
+        const data = await dataProduct.getTransactionData.call(firstBuyer);
         data[0].should.equal(publicKey);
         data[1].should.equal(buyerMetaHash);
         data[3].should.equal(true, 'Is purchased');
@@ -66,7 +67,7 @@ contract('DataProduct', (accounts) => {
 
         await dataProduct.withdraw();
 
-        (await repux.allowance.call(buyer, dataProduct.address)).toNumber().should.equal(0);
+        (await repux.allowance.call(firstBuyer, dataProduct.address)).toNumber().should.equal(0);
         (await repux.balanceOf.call(dataProduct.address)).toNumber().should.equal(0);
         (await repux.balanceOf.call(seller)).toNumber().should.equal((sellerBalance + price - fee));
 
@@ -80,23 +81,80 @@ contract('DataProduct', (accounts) => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
-        await repux.approve(dataProduct.address, price, { from: buyer });
-        await dataProduct.purchase(publicKey, { from: buyer });
+        await repux.approve(dataProduct.address, price, { from: firstBuyer });
+        await dataProduct.purchase(publicKey, { from: firstBuyer });
 
-        const data = await dataProduct.getTransactionData.call(buyer);
+        const data = await dataProduct.getTransactionData.call(firstBuyer);
         data[0].should.equal(publicKey);
         data[3].should.equal(true, 'Is purchased');
         data[4].should.equal(false, 'Is approved');
 
         expectThrow(dataProduct.withdraw());
 
-        (await repux.allowance.call(buyer, dataProduct.address)).toNumber().should.equal(0);
+        (await repux.allowance.call(firstBuyer, dataProduct.address)).toNumber().should.equal(0);
         (await repux.balanceOf.call(dataProduct.address)).toNumber().should.equal((price - fee));
         (await repux.balanceOf.call(seller)).toNumber().should.equal(sellerBalance);
 
         expectThrow(registry.withdraw());
 
         (await repux.balanceOf.call(registry.address)).toNumber().should.equal(fee);
+    });
+
+    it('should forbid purchasing of disabled data product', async () => {
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+
+        await repux.approve(dataProduct.address, price, { from: firstBuyer });
+        await dataProduct.purchase(publicKey, { from: firstBuyer });
+        await dataProduct.approve(firstBuyer, buyerMetaHash);
+
+        await dataProduct.disable();
+
+        (await dataProduct.disabled.call()).should.equal(true);
+
+        expectThrow(dataProduct.purchase(publicKey, { from: secondBuyer }));
+
+        await dataProduct.withdraw();
+
+        (await repux.balanceOf.call(dataProduct.address)).toNumber().should.equal(0);
+        (await repux.balanceOf.call(seller)).toNumber().should.equal((sellerBalance + 2 * (price - fee)));
+
+        const data = await dataProduct.getTransactionData.call(firstBuyer);
+        data[0].should.equal(publicKey);
+    });
+
+    it('should forbid killing of enabled data product', async () => {
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+
+        expectThrow(dataProduct.kill());
+
+        (await dataProduct.disabled.call()).should.equal(false);
+    });
+
+    it('should forbid killing of holding funds data product', async () => {
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+
+        await repux.approve(dataProduct.address, price, { from: firstBuyer });
+        await dataProduct.purchase(publicKey, { from: firstBuyer });
+
+        expectThrow(dataProduct.kill());
+
+        (await repux.balanceOf.call(dataProduct.address)).toNumber().should.equal((price - fee));
+    });
+
+    it('should allow to kill disabled data product', async () => {
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+
+        await dataProduct.disable();
+
+        await dataProduct.kill();
+
+        expectThrow(dataProduct.purchase(publicKey, { from: firstBuyer }));
+
+        (await dataProduct.disabled.call()).should.equal(true);
     });
 
     it('should not be possible to set price lower than transaction fee', async () => {
