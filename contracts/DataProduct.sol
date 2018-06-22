@@ -79,12 +79,15 @@ contract DataProduct is Ownable {
         require(balance > buyersDeposit);
 
         assert(token.transfer(owner, balance.sub(buyersDeposit)));
+
+        registry.registerUpdate(msg.sender);
     }
 
     function setPrice(uint256 newPrice) public onlyOwner {
         require(newPrice > registry.getTransactionFee(newPrice), "Price should be greater than transaction fee value");
 
         price = newPrice;
+
         registry.registerUpdate(msg.sender);
     }
 
@@ -182,14 +185,17 @@ contract DataProduct is Ownable {
         require(keccak256(abi.encodePacked(_sellerMetaHash)) != keccak256(abi.encodePacked("")));
 
         sellerMetaHash = _sellerMetaHash;
+
         registry.registerUpdate(msg.sender);
     }
 
     function getTotalRating() public constant returns (uint256) {
         uint256 total = 0;
+
         for (uint8 score = minScore; score <= maxScore; score++) {
             total = total.add(scoreCount[score].mul(score));
         }
+
         return total;
     }
 
