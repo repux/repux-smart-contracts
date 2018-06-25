@@ -33,6 +33,11 @@ contract Registry is Feeable {
         _;
     }
 
+    modifier onlyOwnerOrDataProduct {
+        require(msg.sender == owner || isDataProduct[msg.sender]);
+        _;
+    }
+
     constructor(address _tokenAddress, address _dataProductFactoryAddress) public {
         owner = msg.sender;
         tokenAddress = _tokenAddress;
@@ -50,25 +55,29 @@ contract Registry is Feeable {
         assert(token.transfer(owner, balance.sub(feesDeposit)));
     }
 
-    function deleteDataProduct(address addr) public onlyOwner returns (bool) {
+    function deleteDataProduct(address _address) public onlyOwnerOrDataProduct returns (bool) {
+        uint256 dataProductBalance = token.balanceOf(_address);
+
+        require(dataProductBalance == 0);
+
         bool deleted = false;
         uint256 deletedIndex = 0;
 
         for (; deletedIndex < dataProducts.length; deletedIndex++) {
-            if (addr == dataProducts[deletedIndex]) {
+            if (_address == dataProducts[deletedIndex]) {
                 deleted = true;
                 break;
             }
         }
 
         if (deleted) {
-            isDataProduct[addr] = false;
+            isDataProduct[_address] = false;
             dataProducts[deletedIndex] = dataProducts[dataProducts.length.sub(1)];
             delete dataProducts[dataProducts.length.sub(1)];
             dataProducts.length = dataProducts.length.sub(1);
-            isDataProduct[addr] = false;
+            isDataProduct[_address] = false;
 
-            triggerDataProductUpdate(addr, DataProductEventAction.DELETE, msg.sender);
+            triggerDataProductUpdate(_address, DataProductEventAction.DELETE, msg.sender);
         }
 
         return deleted;
@@ -119,24 +128,24 @@ contract Registry is Feeable {
         return dataProducts;
     }
 
-    function getDataCreatedFor(address addr) public view returns (address[]) {
-        return dataCreated[addr];
+    function getDataCreatedFor(address _address) public view returns (address[]) {
+        return dataCreated[_address];
     }
 
     function getDataCreated() public view returns (address[]) {
         return getDataCreatedFor(msg.sender);
     }
 
-    function getDataPurchasedFor(address addr) public view returns (address[]) {
-        return dataPurchased[addr];
+    function getDataPurchasedFor(address _address) public view returns (address[]) {
+        return dataPurchased[_address];
     }
 
     function getDataPurchased() public view returns (address[]) {
         return getDataPurchasedFor(msg.sender);
     }
 
-    function getDataApprovedFor(address addr) public view returns (address[]) {
-        return dataApproved[addr];
+    function getDataApprovedFor(address _address) public view returns (address[]) {
+        return dataApproved[_address];
     }
 
     function getDataApproved() public view returns (address[]) {

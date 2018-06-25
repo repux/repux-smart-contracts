@@ -40,6 +40,8 @@ contract DataProduct is Ownable {
 
     uint256 public buyersDeposit;
 
+    bool public disabled = false;
+
     modifier onlyRegistry() {
         require(msg.sender == registryAddress);
         _;
@@ -47,6 +49,11 @@ contract DataProduct is Ownable {
 
     modifier onlyApproved() {
         require(transactions[msg.sender].approved);
+        _;
+    }
+
+    modifier onlyEnabled() {
+        require(!disabled);
         _;
     }
 
@@ -72,6 +79,18 @@ contract DataProduct is Ownable {
         creationTimeStamp = block.timestamp;
     }
 
+    function disable() public onlyOwner onlyEnabled {
+        disabled = true;
+
+        registry.registerUpdate(msg.sender);
+    }
+
+    function kill() public onlyOwner {
+        require(disabled);
+
+        registry.deleteDataProduct(this);
+    }
+
     function withdraw() public onlyOwner {
         uint256 balance = token.balanceOf(this);
 
@@ -83,7 +102,7 @@ contract DataProduct is Ownable {
         registry.registerUpdate(msg.sender);
     }
 
-    function setPrice(uint256 newPrice) public onlyOwner {
+    function setPrice(uint256 newPrice) public onlyOwner onlyEnabled {
         require(newPrice > registry.getTransactionFee(newPrice), "Price should be greater than transaction fee value");
 
         price = newPrice;
@@ -91,7 +110,7 @@ contract DataProduct is Ownable {
         registry.registerUpdate(msg.sender);
     }
 
-    function purchaseFor(address buyerAddress, string buyerPublicKey) public {
+    function purchaseFor(address buyerAddress, string buyerPublicKey) public onlyEnabled {
         require(owner != buyerAddress);
         require(bytes(buyerPublicKey).length != 0);
 
@@ -125,11 +144,11 @@ contract DataProduct is Ownable {
         registry.registerPurchase(buyerAddress);
     }
 
-    function purchase(string publicKey) public {
+    function purchase(string publicKey) public onlyEnabled {
         purchaseFor(msg.sender, publicKey);
     }
 
-    function approve(address buyerAddress, string buyerMetaHash) public onlyOwner {
+    function approve(address buyerAddress, string buyerMetaHash) public onlyOwner onlyEnabled {
         Transaction storage transaction = transactions[buyerAddress];
 
         require(transaction.purchased);
@@ -147,7 +166,7 @@ contract DataProduct is Ownable {
         registry.registerApprove(buyerAddress);
     }
 
-    function rate(uint8 score) public onlyApproved {
+    function rate(uint8 score) public onlyApproved onlyEnabled {
         require(score >= minScore && score <= maxScore);
 
         Transaction storage transaction = transactions[msg.sender];
@@ -167,7 +186,7 @@ contract DataProduct is Ownable {
         registry.registerRating(msg.sender);
     }
 
-    function cancelRating() public onlyApproved {
+    function cancelRating() public onlyApproved onlyEnabled {
         Transaction storage transaction = transactions[msg.sender];
 
         require(transaction.rated);
@@ -181,7 +200,7 @@ contract DataProduct is Ownable {
         registry.registerCancelRating(msg.sender);
     }
 
-    function setSellerMetaHash(string _sellerMetaHash) public onlyOwner {
+    function setSellerMetaHash(string _sellerMetaHash) public onlyOwner onlyEnabled {
         require(keccak256(abi.encodePacked(_sellerMetaHash)) != keccak256(abi.encodePacked("")));
 
         sellerMetaHash = _sellerMetaHash;
