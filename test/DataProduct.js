@@ -129,6 +129,28 @@ contract('DataProduct', (accounts) => {
         data[0].should.equal(publicKey);
     });
 
+    it('should forbid purchasing data product with kyc enabled by non-kyc buyer', async () => {
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+        await dataProduct.setKyc(true);
+
+        expectThrow(dataProduct.purchase(publicKey, { from: firstBuyer }));
+        (await dataProduct.kyc.call()).should.equal(true);
+    });
+
+    it('should allow purchasing data product with kyc enabled by kyc buyer', async () => {
+        await registry.setIdentifiedCustomer(firstBuyer, true);
+
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+        await dataProduct.setKyc(true);
+
+        await repux.approve(dataProduct.address, price, { from: firstBuyer });
+        await dataProduct.purchase(publicKey, { from: firstBuyer });
+
+        (await repux.balanceOf.call(dataProduct.address)).toNumber().should.equal(price);
+    });
+
     it('should forbid killing of enabled data product', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
@@ -201,7 +223,7 @@ contract('DataProduct', (accounts) => {
 
         expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
 
-        (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (7 * price)));
+        (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (8 * price)));
     });
 
     it('should not be possible to cancel transaction by someone else than buyer', async () => {
@@ -224,11 +246,11 @@ contract('DataProduct', (accounts) => {
         await repux.approve(dataProduct.address, price, { from: firstBuyer });
         await dataProduct.purchase(publicKey, { from: firstBuyer });
 
-        (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (9 * price)));
+        (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (10 * price)));
 
         await dataProduct.cancelPurchase({ from: firstBuyer });
 
-        (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (8 * price)));
+        (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (9 * price)));
 
         const data = await dataProduct.getTransactionData.call(firstBuyer);
         data[0].should.equal('');

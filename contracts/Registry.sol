@@ -24,6 +24,7 @@ contract Registry is Feeable {
     mapping(address => address[]) public dataPurchased;
     mapping(address => address[]) public dataFinalised;
     mapping(address => bool) public isDataProduct;
+    mapping(address => bool) public identifiedCustomers;
 
     event DataProductUpdate(address dataProduct, DataProductEventAction action, address sender);
 
@@ -81,6 +82,17 @@ contract Registry is Feeable {
         triggerDataProductUpdate(newDataProduct, DataProductEventAction.CREATE, msg.sender);
 
         return newDataProduct;
+    }
+
+    function isIdentifiedCustomer(address _address) public view returns (bool) {
+        return identifiedCustomers[_address];
+    }
+
+    function setIdentifiedCustomer(address _address, bool _isKyc) public onlyOwner {
+        require(_address != address(0), "Address cannot be empty");
+        require(identifiedCustomers[_address] != _isKyc, "This value is already set for that address");
+
+        identifiedCustomers[_address] = _isKyc;
     }
 
     function registerPurchase(address sender) public onlyDataProduct {
