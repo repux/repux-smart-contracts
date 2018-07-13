@@ -69,7 +69,7 @@ contract DataProduct is Ownable {
 
     modifier isKycRequired() {
         if (kyc) {
-            require(registry.isIdentifiedCustomer(msg.sender));
+            require(registry.isIdentifiedCustomer(msg.sender), "This file cannot be purchased by an unidentified customer");
         }
         _;
     }
