@@ -45,6 +45,7 @@ contract DataProduct is Ownable {
     uint256 public buyersDeposit;
 
     bool public disabled = false;
+    bool public kyc = false;
 
     modifier onlyRegistry() {
         require(msg.sender == registryAddress);
@@ -63,6 +64,13 @@ contract DataProduct is Ownable {
 
     modifier onlyEnabled() {
         require(!disabled);
+        _;
+    }
+
+    modifier isKycRequired() {
+        if (kyc) {
+            require(registry.isIdentifiedCustomer(msg.sender), "This file cannot be purchased by an unidentified customer");
+        }
         _;
     }
 
@@ -120,7 +128,7 @@ contract DataProduct is Ownable {
         registry.registerUpdate(msg.sender);
     }
 
-    function purchaseFor(address buyerAddress, string buyerPublicKey) public onlyEnabled {
+    function purchaseFor(address buyerAddress, string buyerPublicKey) public isKycRequired onlyEnabled {
         require(owner != buyerAddress);
         require(bytes(buyerPublicKey).length != 0);
 
@@ -147,7 +155,7 @@ contract DataProduct is Ownable {
         registry.registerPurchase(buyerAddress);
     }
 
-    function purchase(string publicKey) public onlyEnabled {
+    function purchase(string publicKey) public isKycRequired onlyEnabled {
         purchaseFor(msg.sender, publicKey);
     }
 
@@ -228,6 +236,14 @@ contract DataProduct is Ownable {
         require(keccak256(abi.encodePacked(_sellerMetaHash)) != keccak256(abi.encodePacked("")));
 
         sellerMetaHash = _sellerMetaHash;
+
+        registry.registerUpdate(msg.sender);
+    }
+
+    function setKyc(bool _kyc) public onlyOwner onlyEnabled {
+        require(keccak256(abi.encodePacked(_kyc)) != keccak256(abi.encodePacked("")));
+
+        kyc = _kyc;
 
         registry.registerUpdate(msg.sender);
     }
