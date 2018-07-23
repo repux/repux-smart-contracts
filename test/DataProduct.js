@@ -196,6 +196,16 @@ contract('DataProduct', (accounts) => {
         (await dataProduct.price.call()).toNumber().should.equal(price);
     });
 
+    it('should not be possible to cancel transaction before purchasing data product', async () => {
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+
+        expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
+
+        const data = await dataProduct.getTransactionData.call(firstBuyer);
+        data[0].should.equal('');
+    });
+
     it('should not be possible to cancel transaction before delivery deadline', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
@@ -251,6 +261,23 @@ contract('DataProduct', (accounts) => {
         await dataProduct.cancelPurchase({ from: firstBuyer });
 
         (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (9 * price)));
+
+        const data = await dataProduct.getTransactionData.call(firstBuyer);
+        data[0].should.equal('');
+    });
+
+    it('should be possible to cancel transaction of disabled data product', async () => {
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+
+        await repux.approve(dataProduct.address, price, { from: firstBuyer });
+        await dataProduct.purchase(publicKey, { from: firstBuyer });
+
+        await dataProduct.disable();
+
+        (await dataProduct.disabled.call()).should.equal(true);
+
+        await dataProduct.cancelPurchase({ from: firstBuyer });
 
         const data = await dataProduct.getTransactionData.call(firstBuyer);
         data[0].should.equal('');

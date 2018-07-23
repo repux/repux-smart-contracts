@@ -162,7 +162,7 @@ contract DataProduct is Ownable {
     function cancelPurchase() public onlyBuyer {
         Transaction storage transaction = transactions[msg.sender];
 
-        require(transaction.purchased && !transaction.finalised && now >= transaction.deliveryDeadline);
+        require(transaction.purchased && !transaction.finalised && (now >= transaction.deliveryDeadline || disabled));
 
         uint256 transactionPrice = transaction.price;
 
