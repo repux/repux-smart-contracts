@@ -1,10 +1,11 @@
 pragma solidity 0.4.24;
 
-import "./SafeMath.sol";
+import "./FeeableInterface.sol";
 import "./Ownable.sol";
+import "./SafeMath.sol";
 
 
-contract Feeable is Ownable {
+contract Feeable is Ownable, FeeableInterface {
     using SafeMath for uint256;
 
     uint256 public fileFlatFee = 0;

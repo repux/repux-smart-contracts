@@ -1,38 +1,28 @@
 pragma solidity 0.4.24;
 
 import "./AddressArrayRemover.sol";
-import "./SafeMath.sol";
+import "./DataProductInterface.sol";
 import "./ERC20.sol";
 import "./Ownable.sol";
-import "./Registry.sol";
+import "./RegistryInterface.sol";
+import "./SafeMath.sol";
+import "./TransactionInterface.sol";
+import "./TransactionFactoryInterface.sol";
 
 
-contract DataProduct is Ownable {
+contract DataProduct is Ownable, DataProductInterface {
     using AddressArrayRemover for address[];
     using SafeMath for uint256;
 
-    uint8 constant private minScore = 1;
-    uint8 constant private maxScore = 5;
-
-    struct Transaction {
-        address wallet;
-        string publicKey;
-        string buyerMetaHash;
-        uint256 rateDeadline;
-        uint256 deliveryDeadline;
-        uint256 price;
-        uint256 fee;
-        bool purchased;
-        bool finalised;
-        bool rated;
-        uint8 rating;
-    }
-
-    mapping(address => Transaction) private transactions;
+    mapping(address => address) private buyersTransactions;
     address[] private buyersAddresses;
+    address[] private transactionsAddresses;
 
     address private registryAddress;
-    Registry private registry;
+    RegistryInterface private registry;
+
+    address private transactionFactoryAddress;
+    TransactionFactoryInterface private transactionFactory;
 
     address private tokenAddress;
     ERC20 private token;
@@ -50,18 +40,8 @@ contract DataProduct is Ownable {
     bool public disabled = false;
     bool public kyc = false;
 
-    modifier onlyRegistry() {
-        require(msg.sender == registryAddress);
-        _;
-    }
-
     modifier onlyBuyer() {
-        require(transactions[msg.sender].wallet != address(0));
-        _;
-    }
-
-    modifier onlyFinalised() {
-        require(transactions[msg.sender].finalised);
+        require(buyersTransactions[msg.sender] != address(0));
         _;
     }
 
@@ -79,6 +59,7 @@ contract DataProduct is Ownable {
 
     constructor(
         address _registryAddress,
+        address _transactionFactoryAddress,
         address _owner,
         address _tokenAddress,
         string _sellerMetaHash,
@@ -88,9 +69,12 @@ contract DataProduct is Ownable {
         public
     {
         registryAddress = _registryAddress;
-        registry = Registry(registryAddress);
+        registry = RegistryInterface(registryAddress);
 
         require(_price > registry.getTransactionFee(_price), "Price should be greater than transaction fee value");
+
+        transactionFactoryAddress = _transactionFactoryAddress;
+        transactionFactory = TransactionFactoryInterface(transactionFactoryAddress);
 
         owner = _owner;
         tokenAddress = _tokenAddress;
@@ -123,52 +107,52 @@ contract DataProduct is Ownable {
         registry.registerUpdate(msg.sender);
     }
 
-    function setPrice(uint256 newPrice) public onlyOwner onlyEnabled {
-        require(newPrice > registry.getTransactionFee(newPrice), "Price should be greater than transaction fee value");
-
-        price = newPrice;
-
-        registry.registerUpdate(msg.sender);
-    }
-
-    function purchaseFor(address buyerAddress, string buyerPublicKey) public isKycRequired onlyEnabled {
-        require(owner != buyerAddress);
-        require(bytes(buyerPublicKey).length != 0);
-
-        Transaction storage transaction = transactions[buyerAddress];
-
-        require(!transaction.purchased);
-
-        transaction.purchased = true;
+    function purchaseFor(
+        address _buyerAddress,
+        string _buyerPublicKey
+    )
+        public
+        isKycRequired
+        onlyEnabled
+        returns
+    (
+        address
+    ) {
+        require(buyersTransactions[_buyerAddress] == address(0));
 
         uint256 fee = registry.getTransactionFee(price);
+        address transactionAddress = transactionFactory.createTransaction(
+            owner,
+            _buyerAddress,
+            _buyerPublicKey,
+            now + daysToRate * 1 days,
+            now + daysToDeliver * 1 days,
+            price,
+            fee
+        );
 
-        transaction.price = price;
-        transaction.fee = fee;
-        transaction.wallet = buyerAddress;
-        transaction.publicKey = buyerPublicKey;
-        transaction.rateDeadline = now + daysToRate * 1 days;
-        transaction.deliveryDeadline = now + daysToDeliver * 1 days;
-
-        buyersAddresses.push(buyerAddress);
+        buyersTransactions[_buyerAddress] = transactionAddress;
+        buyersAddresses.push(_buyerAddress);
+        transactionsAddresses.push(transactionAddress);
 
         assert(token.transferFrom(msg.sender, this, price));
 
         buyersDeposit = buyersDeposit.add(price);
 
-        registry.registerPurchase(buyerAddress);
+        registry.registerPurchase(_buyerAddress);
+
+        return transactionAddress;
     }
 
-    function purchase(string publicKey) public isKycRequired onlyEnabled {
-        purchaseFor(msg.sender, publicKey);
+    function purchase(string publicKey) public isKycRequired onlyEnabled returns (address) {
+        return purchaseFor(msg.sender, publicKey);
     }
 
     function cancelPurchase() public onlyBuyer {
-        Transaction storage transaction = transactions[msg.sender];
+        TransactionInterface transaction = TransactionInterface(buyersTransactions[msg.sender]);
 
-        require(transaction.purchased && !transaction.finalised && (now >= transaction.deliveryDeadline || disabled));
-
-        uint256 transactionPrice = transaction.price;
+        uint256 transactionPrice = transaction.price();
+        transaction.cancelPurchase();
 
         deleteTransaction();
         assert(token.transfer(msg.sender, transactionPrice));
@@ -180,47 +164,53 @@ contract DataProduct is Ownable {
 
     function deleteTransaction() private {
         buyersAddresses.removeByValue(msg.sender);
+        transactionsAddresses.removeByValue(buyersTransactions[msg.sender]);
 
-        delete transactions[msg.sender];
+        delete buyersTransactions[msg.sender];
     }
 
-    function finalise(address buyerAddress, string buyerMetaHash) public onlyOwner onlyEnabled {
-        Transaction storage transaction = transactions[buyerAddress];
+    function finalise(address _buyerAddress, string _buyerMetaHash) public onlyOwner onlyEnabled {
+        require(buyersTransactions[_buyerAddress] != address(0));
 
-        require(transaction.purchased && !transaction.finalised);
-        require(keccak256(abi.encodePacked(buyerMetaHash)) != keccak256(abi.encodePacked("")));
+        TransactionInterface transaction = TransactionInterface(buyersTransactions[_buyerAddress]);
+        transaction.finalise(_buyerMetaHash);
+        uint256 transactionFee = transaction.fee();
 
-        transaction.finalised = true;
-        transaction.buyerMetaHash = buyerMetaHash;
-
-        if (transaction.fee > 0) {
-            assert(token.transfer(registryAddress, transaction.fee));
+        if (transactionFee > 0) {
+            assert(token.transfer(registryAddress, transactionFee));
         }
 
-        buyersDeposit = buyersDeposit.sub(transaction.price);
+        buyersDeposit = buyersDeposit.sub(transaction.price());
 
-        registry.registerFinalise(buyerAddress);
+        registry.registerFinalise(_buyerAddress);
     }
 
-    function rate(uint8 score) public onlyFinalised onlyEnabled {
-        require(score >= minScore && score <= maxScore);
+    function rate(uint8 score) public onlyBuyer onlyEnabled {
+        TransactionInterface transaction = TransactionInterface(buyersTransactions[msg.sender]);
+        transaction.rate(score);
 
-        Transaction storage transaction = transactions[msg.sender];
-
-        require(!transaction.rated && now <= transaction.rateDeadline);
-
-        transaction.rated = true;
-        transaction.rating = score;
         rateCount = rateCount.add(1);
         scoreCount[score] = scoreCount[score].add(1);
 
         registry.registerRating(msg.sender);
     }
 
+    function disabled() public view returns (bool) {
+        return disabled;
+    }
+
     function setSellerMetaHash(string _sellerMetaHash) public onlyOwner onlyEnabled {
         require(keccak256(abi.encodePacked(_sellerMetaHash)) != keccak256(abi.encodePacked("")));
 
         sellerMetaHash = _sellerMetaHash;
+
+        registry.registerUpdate(msg.sender);
+    }
+
+    function setPrice(uint256 newPrice) public onlyOwner onlyEnabled {
+        require(newPrice > registry.getTransactionFee(newPrice), "Price should be greater than transaction fee value");
+
+        price = newPrice;
 
         registry.registerUpdate(msg.sender);
     }
@@ -249,33 +239,19 @@ contract DataProduct is Ownable {
         registry.registerUpdate(msg.sender);
     }
 
+    function getTransactionFor(address _address) public view returns (address) {
+        return buyersTransactions[_address];
+    }
+
+    function getTransaction() public view returns (address) {
+        return getTransactionFor(msg.sender);
+    }
+
     function getBuyersAddresses() public view returns (address[]) {
         return buyersAddresses;
     }
 
-    function getTransactionData(address buyerAddress) public view returns (
-        string _publicKey,
-        string _buyerMetaHash,
-        uint256 _rateDeadline,
-        uint256 _deliveryDeadline,
-        uint256 _price,
-        uint256 _fee,
-        bool _purchased,
-        bool _finalised,
-        bool _rated,
-        uint8 _rating
-    ) {
-        Transaction storage transaction = transactions[buyerAddress];
-
-        _publicKey = transaction.publicKey;
-        _buyerMetaHash = transaction.buyerMetaHash;
-        _rateDeadline = transaction.rateDeadline;
-        _deliveryDeadline = transaction.deliveryDeadline;
-        _price = transaction.price;
-        _fee = transaction.fee;
-        _purchased = transaction.purchased;
-        _finalised = transaction.finalised;
-        _rated = transaction.rated;
-        _rating = transaction.rating;
+    function getTransactionsAddresses() public view returns (address[]) {
+        return transactionsAddresses;
     }
 }
