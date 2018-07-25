@@ -11,10 +11,14 @@ contract DataProduct is Ownable {
     using AddressArrayRemover for address[];
     using SafeMath for uint256;
 
+    uint8 constant private minScore = 1;
+    uint8 constant private maxScore = 5;
+
     struct Transaction {
         address wallet;
         string publicKey;
         string buyerMetaHash;
+        uint256 rateDeadline;
         uint256 deliveryDeadline;
         uint256 price;
         uint256 fee;
@@ -24,23 +28,22 @@ contract DataProduct is Ownable {
         uint8 rating;
     }
 
-    mapping(address => Transaction) transactions;
+    mapping(address => Transaction) private transactions;
     address[] private buyersAddresses;
 
-    address public registryAddress;
-    Registry public registry;
+    address private registryAddress;
+    Registry private registry;
 
-    address public tokenAddress;
+    address private tokenAddress;
     ERC20 private token;
 
     string public sellerMetaHash;
     uint256 public price;
     uint256 public creationTimeStamp;
-    uint8 public daysForDeliver;
-    uint8 public minScore = 0;
-    uint8 public maxScore = 5;
-    mapping(uint8 => uint256) public scoreCount;
-    uint256 public rateCount;
+    uint8 public daysToDeliver;
+    uint8 public daysToRate = 30;
+    mapping(uint8 => uint256) private scoreCount;
+    uint256 private rateCount;
 
     uint256 public buyersDeposit;
 
@@ -80,7 +83,7 @@ contract DataProduct is Ownable {
         address _tokenAddress,
         string _sellerMetaHash,
         uint256 _price,
-        uint8 _daysForDeliver
+        uint8 _daysToDeliver
     )
         public
     {
@@ -94,7 +97,7 @@ contract DataProduct is Ownable {
         token = ERC20(tokenAddress);
         sellerMetaHash = _sellerMetaHash;
         price = _price;
-        daysForDeliver = _daysForDeliver;
+        daysToDeliver = _daysToDeliver;
         creationTimeStamp = now;
     }
 
@@ -144,7 +147,8 @@ contract DataProduct is Ownable {
         transaction.fee = fee;
         transaction.wallet = buyerAddress;
         transaction.publicKey = buyerPublicKey;
-        transaction.deliveryDeadline = now + daysForDeliver * 1 days;
+        transaction.rateDeadline = now + daysToRate * 1 days;
+        transaction.deliveryDeadline = now + daysToDeliver * 1 days;
 
         buyersAddresses.push(buyerAddress);
 
@@ -203,33 +207,14 @@ contract DataProduct is Ownable {
 
         Transaction storage transaction = transactions[msg.sender];
 
-        if (transaction.rated) {
-            uint8 originalScore = transaction.rating;
-            require(score != originalScore);
-            scoreCount[originalScore] = scoreCount[originalScore].sub(1);
-        } else {
-            rateCount = rateCount.add(1);
-            transaction.rated = true;
-        }
+        require(!transaction.rated && now <= transaction.rateDeadline);
 
-        scoreCount[score] = scoreCount[score].add(1);
+        transaction.rated = true;
         transaction.rating = score;
+        rateCount = rateCount.add(1);
+        scoreCount[score] = scoreCount[score].add(1);
 
         registry.registerRating(msg.sender);
-    }
-
-    function cancelRating() public onlyFinalised onlyEnabled {
-        Transaction storage transaction = transactions[msg.sender];
-
-        require(transaction.rated);
-
-        transaction.rated = false;
-        uint8 score = transaction.rating;
-        scoreCount[score] = scoreCount[score].sub(1);
-        transaction.rating = 0;
-        rateCount = rateCount.sub(1);
-
-        registry.registerCancelRating(msg.sender);
     }
 
     function setSellerMetaHash(string _sellerMetaHash) public onlyOwner onlyEnabled {
@@ -248,22 +233,20 @@ contract DataProduct is Ownable {
         registry.registerUpdate(msg.sender);
     }
 
-    function setDaysForDeliver(uint8 _daysForDeliver) public onlyOwner onlyEnabled {
-        require(keccak256(abi.encodePacked(_daysForDeliver)) != keccak256(abi.encodePacked("")));
+    function setDaysToDeliver(uint8 _daysToDeliver) public onlyOwner onlyEnabled {
+        require(keccak256(abi.encodePacked(_daysToDeliver)) != keccak256(abi.encodePacked("")));
 
-        daysForDeliver = _daysForDeliver;
+        daysToDeliver = _daysToDeliver;
 
         registry.registerUpdate(msg.sender);
     }
 
-    function getTotalRating() public constant returns (uint256) {
-        uint256 total = 0;
+    function setDaysToRate(uint8 _daysToRate) public onlyOwner onlyEnabled {
+        require(keccak256(abi.encodePacked(_daysToRate)) != keccak256(abi.encodePacked("")));
 
-        for (uint8 score = minScore; score <= maxScore; score++) {
-            total = total.add(scoreCount[score].mul(score));
-        }
+        daysToRate = _daysToRate;
 
-        return total;
+        registry.registerUpdate(msg.sender);
     }
 
     function getBuyersAddresses() public view returns (address[]) {
@@ -273,6 +256,7 @@ contract DataProduct is Ownable {
     function getTransactionData(address buyerAddress) public view returns (
         string _publicKey,
         string _buyerMetaHash,
+        uint256 _rateDeadline,
         uint256 _deliveryDeadline,
         uint256 _price,
         uint256 _fee,
@@ -285,6 +269,7 @@ contract DataProduct is Ownable {
 
         _publicKey = transaction.publicKey;
         _buyerMetaHash = transaction.buyerMetaHash;
+        _rateDeadline = transaction.rateDeadline;
         _deliveryDeadline = transaction.deliveryDeadline;
         _price = transaction.price;
         _fee = transaction.fee;

@@ -11,20 +11,20 @@ contract Registry is Feeable {
     using AddressArrayRemover for address[];
     using SafeMath for uint256;
 
-    enum DataProductEventAction { CREATE, UPDATE, DELETE, PURCHASE, CANCEL_PURCHASE, FINALISE, RATE, CANCEL_RATING }
+    enum DataProductEventAction { CREATE, UPDATE, DELETE, PURCHASE, CANCEL_PURCHASE, FINALISE, RATE }
 
-    address public tokenAddress;
+    address private tokenAddress;
     ERC20 private token;
 
-    address public dataProductFactoryAddress;
+    address private dataProductFactoryAddress;
     DataProductFactoryInterface private dataProductFactory;
 
-    address[] public dataProducts;
-    mapping(address => address[]) public dataCreated;
-    mapping(address => address[]) public dataPurchased;
-    mapping(address => address[]) public dataFinalised;
-    mapping(address => bool) public isDataProduct;
-    mapping(address => bool) public identifiedCustomers;
+    address[] private dataProducts;
+    mapping(address => address[]) private dataCreated;
+    mapping(address => address[]) private dataPurchased;
+    mapping(address => address[]) private dataFinalised;
+    mapping(address => bool) private isDataProduct;
+    mapping(address => bool) private identifiedCustomers;
 
     event DataProductUpdate(address dataProduct, DataProductEventAction action, address sender);
 
@@ -67,13 +67,13 @@ contract Registry is Feeable {
         return true;
     }
 
-    function createDataProduct(string _sellerMetaHash, uint256 _price, uint8 _daysForDeliver) public returns (address) {
+    function createDataProduct(string _sellerMetaHash, uint256 _price, uint8 _daysToDeliver) public returns (address) {
         address newDataProduct = dataProductFactory.createDataProduct(
             msg.sender,
             tokenAddress,
             _sellerMetaHash,
             _price,
-            _daysForDeliver
+            _daysToDeliver
         );
         dataProducts.push(newDataProduct);
         dataCreated[msg.sender].push(newDataProduct);
@@ -119,10 +119,6 @@ contract Registry is Feeable {
 
     function registerRating(address sender) external onlyDataProduct {
         triggerDataProductUpdate(msg.sender, DataProductEventAction.RATE, sender);
-    }
-
-    function registerCancelRating(address sender) external onlyDataProduct {
-        triggerDataProductUpdate(msg.sender, DataProductEventAction.CANCEL_RATING, sender);
     }
 
     function getDataProducts() public view returns (address[]){
