@@ -25,7 +25,7 @@ contract DataProductFactory is Ownable, DataProductFactoryInterface {
         address _tokenAddress,
         string _sellerMetaHash,
         uint256 _price,
-        uint8 _daysForDeliver
+        uint8 _daysToDeliver
     )
         public
         onlyRegistry
@@ -33,6 +33,6 @@ contract DataProductFactory is Ownable, DataProductFactoryInterface {
     (
         address
     ) {
-        return new DataProduct(msg.sender, _owner, _tokenAddress, _sellerMetaHash, _price, _daysForDeliver);
+        return new DataProduct(msg.sender, _owner, _tokenAddress, _sellerMetaHash, _price, _daysToDeliver);
     }
 }

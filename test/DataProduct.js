@@ -58,9 +58,9 @@ contract('DataProduct', (accounts) => {
         const data = await dataProduct.getTransactionData.call(firstBuyer);
         data[0].should.equal(publicKey);
         data[1].should.equal(buyerMetaHash);
-        data[4].toNumber().should.equal(fee);
-        data[5].should.equal(true, 'Is purchased');
-        data[6].should.equal(true, 'Is finalised');
+        data[5].toNumber().should.equal(fee);
+        data[6].should.equal(true, 'Is purchased');
+        data[7].should.equal(true, 'Is finalised');
         (await dataProduct.buyersDeposit.call()).toNumber().should.equal(0);
         (await repux.balanceOf.call(registry.address)).toNumber().should.equal(fee);
 
@@ -96,7 +96,7 @@ contract('DataProduct', (accounts) => {
         await dataProduct.purchase(publicKey, { from: firstBuyer });
 
         const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[6].should.equal(false, 'Is finalised');
+        data[7].should.equal(false, 'Is finalised');
 
         expectThrow(dataProduct.withdraw());
         expectThrow(registry.withdraw());
@@ -217,7 +217,7 @@ contract('DataProduct', (accounts) => {
 
         const data = await dataProduct.getTransactionData.call(firstBuyer);
         data[0].should.equal(publicKey);
-        data[2].toNumber().should.be.above(Math.floor(new Date().getTime() / 1000));
+        data[3].toNumber().should.be.above(Math.floor(new Date().getTime() / 1000));
     });
 
     it('should not be possible to cancel transaction after finalisation', async () => {
@@ -229,7 +229,7 @@ contract('DataProduct', (accounts) => {
         await dataProduct.finalise(firstBuyer, buyerMetaHash);
 
         const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[6].should.equal(true, 'Is finalised');
+        data[7].should.equal(true, 'Is finalised');
 
         expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
 
@@ -246,7 +246,7 @@ contract('DataProduct', (accounts) => {
         expectThrow(dataProduct.cancelPurchase({ from: seller }));
 
         const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[5].should.equal(true, 'Is purchased');
+        data[6].should.equal(true, 'Is purchased');
     });
 
     it('should be possible to cancel transaction after delivery deadline', async () => {
@@ -293,7 +293,23 @@ contract('DataProduct', (accounts) => {
         expectThrow(dataProduct.rate(5, { from: firstBuyer }));
 
         const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[6].should.equal(false, 'Is finalised');
-        data[7].should.equal(false, 'Is rated');
+        data[7].should.equal(false, 'Is finalised');
+        data[8].should.equal(false, 'Is rated');
+    });
+
+    it('should not be possible to rate transaction twice', async () => {
+        const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
+        const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
+
+        await repux.approve(dataProduct.address, price, { from: firstBuyer });
+        await dataProduct.purchase(publicKey, { from: firstBuyer });
+        await dataProduct.finalise(firstBuyer, buyerMetaHash);
+
+        await dataProduct.rate(5, { from: firstBuyer });
+        expectThrow(dataProduct.rate(5, { from: firstBuyer }));
+
+        const data = await dataProduct.getTransactionData.call(firstBuyer);
+        data[7].should.equal(true, 'Is finalised');
+        data[8].should.equal(true, 'Is rated');
     });
 });
