@@ -1,13 +1,14 @@
 pragma solidity 0.4.24;
 
 import "./AddressArrayRemover.sol";
-import "./SafeMath.sol";
-import "./ERC20.sol";
 import "./DataProductFactoryInterface.sol";
+import "./ERC20.sol";
 import "./Feeable.sol";
+import "./RegistryInterface.sol";
+import "./SafeMath.sol";
 
 
-contract Registry is Feeable {
+contract Registry is RegistryInterface, Feeable {
     using AddressArrayRemover for address[];
     using SafeMath for uint256;
 
@@ -19,31 +20,34 @@ contract Registry is Feeable {
     address private dataProductFactoryAddress;
     DataProductFactoryInterface private dataProductFactory;
 
+    address private transactionFactoryAddress;
+
     address[] private dataProducts;
     mapping(address => address[]) private dataCreated;
     mapping(address => address[]) private dataPurchased;
     mapping(address => address[]) private dataFinalised;
-    mapping(address => bool) private isDataProduct;
+    mapping(address => bool) private registeredDataProducts;
     mapping(address => bool) private identifiedCustomers;
 
     event DataProductUpdate(address dataProduct, DataProductEventAction action, address sender);
 
     modifier onlyDataProduct {
-        require(isDataProduct[msg.sender]);
+        require(isDataProduct(msg.sender));
         _;
     }
 
     modifier onlyOwnerOrDataProduct {
-        require(msg.sender == owner || isDataProduct[msg.sender]);
+        require(msg.sender == owner || isDataProduct(msg.sender));
         _;
     }
 
-    constructor(address _tokenAddress, address _dataProductFactoryAddress) public {
+    constructor(address _tokenAddress, address _dataProductFactoryAddress, address _transactionFactoryAddress) public {
         owner = msg.sender;
         tokenAddress = _tokenAddress;
         token = ERC20(tokenAddress);
         dataProductFactoryAddress = _dataProductFactoryAddress;
         dataProductFactory = DataProductFactoryInterface(dataProductFactoryAddress);
+        transactionFactoryAddress = _transactionFactoryAddress;
     }
 
     function withdraw() public onlyOwner {
@@ -60,7 +64,7 @@ contract Registry is Feeable {
         require(dataProductBalance == 0, "Can not delete Data Product which holds the funds");
 
         dataProducts.removeByValue(_address);
-        isDataProduct[_address] = false;
+        registeredDataProducts[_address] = false;
 
         triggerDataProductUpdate(_address, DataProductEventAction.DELETE, msg.sender);
 
@@ -69,6 +73,7 @@ contract Registry is Feeable {
 
     function createDataProduct(string _sellerMetaHash, uint256 _price, uint8 _daysToDeliver) public returns (address) {
         address newDataProduct = dataProductFactory.createDataProduct(
+            transactionFactoryAddress,
             msg.sender,
             tokenAddress,
             _sellerMetaHash,
@@ -77,11 +82,15 @@ contract Registry is Feeable {
         );
         dataProducts.push(newDataProduct);
         dataCreated[msg.sender].push(newDataProduct);
-        isDataProduct[newDataProduct] = true;
+        registeredDataProducts[newDataProduct] = true;
 
         triggerDataProductUpdate(newDataProduct, DataProductEventAction.CREATE, msg.sender);
 
         return newDataProduct;
+    }
+
+    function isDataProduct(address _address) public view returns (bool) {
+        return registeredDataProducts[_address];
     }
 
     function isIdentifiedCustomer(address _address) public view returns (bool) {
@@ -95,19 +104,19 @@ contract Registry is Feeable {
         identifiedCustomers[_address] = _isKyc;
     }
 
-    function registerPurchase(address sender) public onlyDataProduct {
+    function registerPurchase(address sender) external onlyDataProduct {
         dataPurchased[sender].push(msg.sender);
 
         triggerDataProductUpdate(msg.sender, DataProductEventAction.PURCHASE, sender);
     }
 
-    function registerCancelPurchase(address sender) public onlyDataProduct {
+    function registerCancelPurchase(address sender) external onlyDataProduct {
         dataPurchased[sender].removeByValue(msg.sender);
 
         triggerDataProductUpdate(msg.sender, DataProductEventAction.CANCEL_PURCHASE, sender);
     }
 
-    function registerFinalise(address sender) public onlyDataProduct {
+    function registerFinalise(address sender) external onlyDataProduct {
         dataFinalised[sender].push(msg.sender);
 
         triggerDataProductUpdate(msg.sender, DataProductEventAction.FINALISE, sender);

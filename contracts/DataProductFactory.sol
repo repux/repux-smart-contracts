@@ -1,11 +1,17 @@
 pragma solidity 0.4.24;
 
 import "./DataProduct.sol";
+import "./DataProductFactoryInterface.sol";
 import "./Ownable.sol";
 
 
 contract DataProductFactory is Ownable, DataProductFactoryInterface {
     address public registryAddress;
+
+    modifier onlyRegistry() {
+        require(msg.sender == registryAddress);
+        _;
+    }
 
     constructor() public {
         owner = msg.sender;
@@ -15,12 +21,8 @@ contract DataProductFactory is Ownable, DataProductFactoryInterface {
         registryAddress = _registryAddress;
     }
 
-    modifier onlyRegistry() {
-        require(msg.sender == registryAddress);
-        _;
-    }
-
     function createDataProduct(
+        address _transactionFactoryAddress,
         address _owner,
         address _tokenAddress,
         string _sellerMetaHash,
@@ -33,6 +35,14 @@ contract DataProductFactory is Ownable, DataProductFactoryInterface {
     (
         address
     ) {
-        return new DataProduct(msg.sender, _owner, _tokenAddress, _sellerMetaHash, _price, _daysToDeliver);
+        return new DataProduct(
+            msg.sender,
+            _transactionFactoryAddress,
+            _owner,
+            _tokenAddress,
+            _sellerMetaHash,
+            _price,
+            _daysToDeliver
+        );
     }
 }
