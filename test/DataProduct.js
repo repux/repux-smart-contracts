@@ -1,6 +1,7 @@
 const DataProduct = artifacts.require('./DataProduct.sol');
 const Registry = artifacts.require('./Registry.sol');
 const RepuX = artifacts.require('./DemoToken.sol');
+const Transaction = artifacts.require('./Transaction.sol');
 
 const should = require('chai').should();
 const expectThrow = require('./helpers/expectThrow');
@@ -55,12 +56,15 @@ contract('DataProduct', (accounts) => {
 
         await dataProduct.finalise(firstBuyer, buyerMetaHash);
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[0].should.equal(publicKey);
-        data[1].should.equal(buyerMetaHash);
-        data[5].toNumber().should.equal(fee);
-        data[6].should.equal(true, 'Is purchased');
-        data[7].should.equal(true, 'Is finalised');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        const transaction = Transaction.at(transactionAddress);
+
+        (await transaction.buyerPublicKey.call()).should.equal(publicKey);
+        (await transaction.buyerMetaHash.call()).should.equal(buyerMetaHash);
+        (await transaction.fee.call()).toNumber().should.equal(fee);
+        (await transaction.purchased.call()).should.equal(true);
+        (await transaction.finalised.call()).should.equal(true);
+
         (await dataProduct.buyersDeposit.call()).toNumber().should.equal(0);
         (await repux.balanceOf.call(registry.address)).toNumber().should.equal(fee);
 
@@ -95,8 +99,10 @@ contract('DataProduct', (accounts) => {
         await repux.approve(dataProduct.address, price, { from: firstBuyer });
         await dataProduct.purchase(publicKey, { from: firstBuyer });
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[7].should.equal(false, 'Is finalised');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        const transaction = Transaction.at(transactionAddress);
+
+        (await transaction.finalised.call()).should.equal(false);
 
         expectThrow(dataProduct.withdraw());
         expectThrow(registry.withdraw());
@@ -125,8 +131,10 @@ contract('DataProduct', (accounts) => {
         (await repux.balanceOf.call(dataProduct.address)).toNumber().should.equal(0);
         (await repux.balanceOf.call(seller)).toNumber().should.equal((sellerBalance + 2 * (price - fee)));
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[0].should.equal(publicKey);
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        const transaction = Transaction.at(transactionAddress);
+
+        (await transaction.buyerPublicKey.call()).should.equal(publicKey);
     });
 
     it('should forbid purchasing data product with kyc enabled by non-kyc buyer', async () => {
@@ -202,8 +210,8 @@ contract('DataProduct', (accounts) => {
 
         expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[0].should.equal('');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        parseInt(transactionAddress).should.equal(0);
     });
 
     it('should not be possible to cancel transaction before delivery deadline', async () => {
@@ -215,9 +223,11 @@ contract('DataProduct', (accounts) => {
 
         expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[0].should.equal(publicKey);
-        data[3].toNumber().should.be.above(Math.floor(new Date().getTime() / 1000));
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        const transaction = Transaction.at(transactionAddress);
+
+        (await transaction.buyerPublicKey.call()).should.equal(publicKey);
+        (await transaction.deliveryDeadline.call()).toNumber().should.be.above(Math.floor(new Date().getTime() / 1000));
     });
 
     it('should not be possible to cancel transaction after finalisation', async () => {
@@ -228,8 +238,10 @@ contract('DataProduct', (accounts) => {
         await dataProduct.purchase(publicKey, { from: firstBuyer });
         await dataProduct.finalise(firstBuyer, buyerMetaHash);
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[7].should.equal(true, 'Is finalised');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        const transaction = Transaction.at(transactionAddress);
+
+        (await transaction.finalised.call()).should.equal(true);
 
         expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
 
@@ -245,8 +257,10 @@ contract('DataProduct', (accounts) => {
 
         expectThrow(dataProduct.cancelPurchase({ from: seller }));
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[6].should.equal(true, 'Is purchased');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        const transaction = Transaction.at(transactionAddress);
+
+        (await transaction.purchased.call()).should.equal(true);
     });
 
     it('should be possible to cancel transaction after delivery deadline', async () => {
@@ -262,8 +276,8 @@ contract('DataProduct', (accounts) => {
 
         (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (9 * price)));
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[0].should.equal('');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        parseInt(transactionAddress).should.equal(0);
     });
 
     it('should be possible to cancel transaction of disabled data product', async () => {
@@ -279,8 +293,8 @@ contract('DataProduct', (accounts) => {
 
         await dataProduct.cancelPurchase({ from: firstBuyer });
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[0].should.equal('');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        parseInt(transactionAddress).should.equal(0);
     });
 
     it('should not be possible to rate unfinalised transaction', async () => {
@@ -292,9 +306,11 @@ contract('DataProduct', (accounts) => {
 
         expectThrow(dataProduct.rate(5, { from: firstBuyer }));
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[7].should.equal(false, 'Is finalised');
-        data[8].should.equal(false, 'Is rated');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        const transaction = Transaction.at(transactionAddress);
+
+        (await transaction.finalised.call()).should.equal(false);
+        (await transaction.rated.call()).should.equal(false);
     });
 
     it('should not be possible to rate transaction twice', async () => {
@@ -308,8 +324,10 @@ contract('DataProduct', (accounts) => {
         await dataProduct.rate(5, { from: firstBuyer });
         expectThrow(dataProduct.rate(5, { from: firstBuyer }));
 
-        const data = await dataProduct.getTransactionData.call(firstBuyer);
-        data[7].should.equal(true, 'Is finalised');
-        data[8].should.equal(true, 'Is rated');
+        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
+        const transaction = Transaction.at(transactionAddress);
+
+        (await transaction.finalised.call()).should.equal(true);
+        (await transaction.rated.call()).should.equal(true);
     });
 });
