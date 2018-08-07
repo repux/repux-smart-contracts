@@ -1,7 +1,7 @@
 const DataProduct = artifacts.require('./DataProduct.sol');
 const Registry = artifacts.require('./Registry.sol');
 const RepuX = artifacts.require('./DemoToken.sol');
-const Transaction = artifacts.require('./Transaction.sol');
+const Order = artifacts.require('./Order.sol');
 
 const should = require('chai').should();
 const expectThrow = require('./helpers/expectThrow');
@@ -33,10 +33,10 @@ contract('DataProduct', (accounts) => {
         await registry.proposeNewFeeAdmin(seller);
         await registry.acceptFeeAdminTransfer();
 
-        await registry.setTransactionFlatFee(flatFee);
-        await registry.setTransactionPercentageFee(percentageFee);
+        await registry.setOrderFlatFee(flatFee);
+        await registry.setOrderPercentageFee(percentageFee);
 
-        fee = (await registry.getTransactionFee.call(price)).toNumber();
+        fee = (await registry.getOrderFee.call(price)).toNumber();
     });
 
     it('should go through the whole purchase flow', async () => {
@@ -56,14 +56,14 @@ contract('DataProduct', (accounts) => {
 
         await dataProduct.finalise(firstBuyer, buyerMetaHash);
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        const transaction = Transaction.at(transactionAddress);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        const order = Order.at(orderAddress);
 
-        (await transaction.buyerPublicKey.call()).should.equal(publicKey);
-        (await transaction.buyerMetaHash.call()).should.equal(buyerMetaHash);
-        (await transaction.fee.call()).toNumber().should.equal(fee);
-        (await transaction.purchased.call()).should.equal(true);
-        (await transaction.finalised.call()).should.equal(true);
+        (await order.buyerPublicKey.call()).should.equal(publicKey);
+        (await order.buyerMetaHash.call()).should.equal(buyerMetaHash);
+        (await order.fee.call()).toNumber().should.equal(fee);
+        (await order.purchased.call()).should.equal(true);
+        (await order.finalised.call()).should.equal(true);
 
         (await dataProduct.buyersDeposit.call()).toNumber().should.equal(0);
         (await repux.balanceOf.call(registry.address)).toNumber().should.equal(fee);
@@ -92,17 +92,17 @@ contract('DataProduct', (accounts) => {
         (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (2 * price)));
     });
 
-    it('should forbid withdraw of unfinalised transaction', async () => {
+    it('should forbid withdraw of unfinalised order', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
         await repux.approve(dataProduct.address, price, { from: firstBuyer });
         await dataProduct.purchase(publicKey, { from: firstBuyer });
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        const transaction = Transaction.at(transactionAddress);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        const order = Order.at(orderAddress);
 
-        (await transaction.finalised.call()).should.equal(false);
+        (await order.finalised.call()).should.equal(false);
 
         expectThrow(dataProduct.withdraw());
         expectThrow(registry.withdraw());
@@ -131,10 +131,10 @@ contract('DataProduct', (accounts) => {
         (await repux.balanceOf.call(dataProduct.address)).toNumber().should.equal(0);
         (await repux.balanceOf.call(seller)).toNumber().should.equal((sellerBalance + 2 * (price - fee)));
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        const transaction = Transaction.at(transactionAddress);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        const order = Order.at(orderAddress);
 
-        (await transaction.buyerPublicKey.call()).should.equal(publicKey);
+        (await order.buyerPublicKey.call()).should.equal(publicKey);
     });
 
     it('should forbid purchasing data product with kyc enabled by non-kyc buyer', async () => {
@@ -193,7 +193,7 @@ contract('DataProduct', (accounts) => {
         (await dataProduct.disabled.call()).should.equal(true);
     });
 
-    it('should not be possible to set price lower than transaction fee', async () => {
+    it('should not be possible to set price lower than order fee', async () => {
         expectThrow(registry.createDataProduct(sellerMetaHash, toLowPrice, 2));
 
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
@@ -204,17 +204,17 @@ contract('DataProduct', (accounts) => {
         (await dataProduct.price.call()).toNumber().should.equal(price);
     });
 
-    it('should not be possible to cancel transaction before purchasing data product', async () => {
+    it('should not be possible to cancel order before purchasing data product', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
         expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        parseInt(transactionAddress).should.equal(0);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        parseInt(orderAddress).should.equal(0);
     });
 
-    it('should not be possible to cancel transaction before delivery deadline', async () => {
+    it('should not be possible to cancel order before delivery deadline', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
@@ -223,14 +223,14 @@ contract('DataProduct', (accounts) => {
 
         expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        const transaction = Transaction.at(transactionAddress);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        const order = Order.at(orderAddress);
 
-        (await transaction.buyerPublicKey.call()).should.equal(publicKey);
-        (await transaction.deliveryDeadline.call()).toNumber().should.be.above(Math.floor(new Date().getTime() / 1000));
+        (await order.buyerPublicKey.call()).should.equal(publicKey);
+        (await order.deliveryDeadline.call()).toNumber().should.be.above(Math.floor(new Date().getTime() / 1000));
     });
 
-    it('should not be possible to cancel transaction after finalisation', async () => {
+    it('should not be possible to cancel order after finalisation', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
@@ -238,17 +238,17 @@ contract('DataProduct', (accounts) => {
         await dataProduct.purchase(publicKey, { from: firstBuyer });
         await dataProduct.finalise(firstBuyer, buyerMetaHash);
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        const transaction = Transaction.at(transactionAddress);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        const order = Order.at(orderAddress);
 
-        (await transaction.finalised.call()).should.equal(true);
+        (await order.finalised.call()).should.equal(true);
 
         expectThrow(dataProduct.cancelPurchase({ from: firstBuyer }));
 
         (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (8 * price)));
     });
 
-    it('should not be possible to cancel transaction by someone else than buyer', async () => {
+    it('should not be possible to cancel order by someone else than buyer', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 0);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
@@ -257,13 +257,13 @@ contract('DataProduct', (accounts) => {
 
         expectThrow(dataProduct.cancelPurchase({ from: seller }));
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        const transaction = Transaction.at(transactionAddress);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        const order = Order.at(orderAddress);
 
-        (await transaction.purchased.call()).should.equal(true);
+        (await order.purchased.call()).should.equal(true);
     });
 
-    it('should be possible to cancel transaction after delivery deadline', async () => {
+    it('should be possible to cancel order after delivery deadline', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 0);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
@@ -276,11 +276,11 @@ contract('DataProduct', (accounts) => {
 
         (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal((buyerBalance - (9 * price)));
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        parseInt(transactionAddress).should.equal(0);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        parseInt(orderAddress).should.equal(0);
     });
 
-    it('should be possible to cancel transaction of disabled data product', async () => {
+    it('should be possible to cancel order of disabled data product', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
@@ -293,11 +293,11 @@ contract('DataProduct', (accounts) => {
 
         await dataProduct.cancelPurchase({ from: firstBuyer });
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        parseInt(transactionAddress).should.equal(0);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        parseInt(orderAddress).should.equal(0);
     });
 
-    it('should not be possible to rate unfinalised transaction', async () => {
+    it('should not be possible to rate unfinalised order', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
@@ -306,14 +306,14 @@ contract('DataProduct', (accounts) => {
 
         expectThrow(dataProduct.rate(5, { from: firstBuyer }));
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        const transaction = Transaction.at(transactionAddress);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        const order = Order.at(orderAddress);
 
-        (await transaction.finalised.call()).should.equal(false);
-        (await transaction.rated.call()).should.equal(false);
+        (await order.finalised.call()).should.equal(false);
+        (await order.rated.call()).should.equal(false);
     });
 
-    it('should not be possible to rate transaction twice', async () => {
+    it('should not be possible to rate order twice', async () => {
         const dataProductTx = await registry.createDataProduct(sellerMetaHash, price, 2);
         const dataProduct = DataProduct.at(dataProductTx.logs[0].args.dataProduct);
 
@@ -324,10 +324,10 @@ contract('DataProduct', (accounts) => {
         await dataProduct.rate(5, { from: firstBuyer });
         expectThrow(dataProduct.rate(5, { from: firstBuyer }));
 
-        const transactionAddress = await dataProduct.getTransaction.call({ from: firstBuyer });
-        const transaction = Transaction.at(transactionAddress);
+        const orderAddress = await dataProduct.getOrder.call({ from: firstBuyer });
+        const order = Order.at(orderAddress);
 
-        (await transaction.finalised.call()).should.equal(true);
-        (await transaction.rated.call()).should.equal(true);
+        (await order.finalised.call()).should.equal(true);
+        (await order.rated.call()).should.equal(true);
     });
 });

@@ -10,8 +10,8 @@ contract Feeable is Ownable, FeeableInterface {
 
     uint256 public fileFlatFee = 0;
     uint256 public fileStorageFee = 0;
-    uint256 public transactionFlatFee = 0;
-    uint256 public transactionPercentageFee = 0;
+    uint256 public orderFlatFee = 0;
+    uint256 public orderPercentageFee = 0;
     uint256 public developerFlatFee = 0;
     uint256 public developerPercentageFee = 0;
     address public feeAdmin;
@@ -45,12 +45,12 @@ contract Feeable is Ownable, FeeableInterface {
         fileStorageFee = fee;
     }
 
-    function setTransactionFlatFee(uint256 fee) external onlyFeeAdmin {
-        transactionFlatFee = fee;
+    function setOrderFlatFee(uint256 fee) external onlyFeeAdmin {
+        orderFlatFee = fee;
     }
 
-    function setTransactionPercentageFee(uint256 fee) external onlyFeeAdmin {
-        transactionPercentageFee = fee;
+    function setOrderPercentageFee(uint256 fee) external onlyFeeAdmin {
+        orderPercentageFee = fee;
     }
 
     function setDeveloperFlatFee(uint256 fee) external onlyFeeAdmin {
@@ -61,7 +61,7 @@ contract Feeable is Ownable, FeeableInterface {
         developerPercentageFee = fee;
     }
 
-    function getTransactionFee(uint256 price) public view returns (uint256) {
-        return transactionFlatFee.add(price.mul(transactionPercentageFee).div(100));
+    function getOrderFee(uint256 price) public view returns (uint256) {
+        return orderFlatFee.add(price.mul(orderPercentageFee).div(100));
     }
 }

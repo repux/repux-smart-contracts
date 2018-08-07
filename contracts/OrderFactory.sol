@@ -2,11 +2,11 @@ pragma solidity 0.4.24;
 
 import "./Ownable.sol";
 import "./RegistryInterface.sol";
-import "./Transaction.sol";
-import "./TransactionFactoryInterface.sol";
+import "./Order.sol";
+import "./OrderFactoryInterface.sol";
 
 
-contract TransactionFactory is Ownable, TransactionFactoryInterface {
+contract OrderFactory is Ownable, OrderFactoryInterface {
     address private registryAddress;
     RegistryInterface private registry;
 
@@ -24,7 +24,7 @@ contract TransactionFactory is Ownable, TransactionFactoryInterface {
         registry = RegistryInterface(registryAddress);
     }
 
-    function createTransaction(
+    function createOrder(
         address _owner,
         address _buyerAddress,
         string _buyerPublicKey,
@@ -39,7 +39,7 @@ contract TransactionFactory is Ownable, TransactionFactoryInterface {
     (
         address
     ) {
-        return new Transaction(
+        return new Order(
             msg.sender,
             _owner,
             _buyerAddress,

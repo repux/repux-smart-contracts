@@ -24,15 +24,15 @@ contract('Registry', (accounts) => {
     it('should not be able to set fees as owner', async () => {
         expectThrow(registry.setFileFlatFee(flatFee));
         expectThrow(registry.setFileStorageFee(flatFee));
-        expectThrow(registry.setTransactionFlatFee(flatFee));
-        expectThrow(registry.setTransactionPercentageFee(percentageFee));
+        expectThrow(registry.setOrderFlatFee(flatFee));
+        expectThrow(registry.setOrderPercentageFee(percentageFee));
         expectThrow(registry.setDeveloperFlatFee(flatFee));
         expectThrow(registry.setDeveloperPercentageFee(percentageFee));
 
         (await registry.fileFlatFee.call()).toNumber().should.equal(0);
         (await registry.fileStorageFee.call()).toNumber().should.equal(0);
-        (await registry.transactionFlatFee.call()).toNumber().should.equal(0);
-        (await registry.transactionPercentageFee.call()).toNumber().should.equal(0);
+        (await registry.orderFlatFee.call()).toNumber().should.equal(0);
+        (await registry.orderPercentageFee.call()).toNumber().should.equal(0);
         (await registry.developerFlatFee.call()).toNumber().should.equal(0);
         (await registry.developerPercentageFee.call()).toNumber().should.equal(0);
     });
@@ -40,15 +40,15 @@ contract('Registry', (accounts) => {
     it('should be able to set fees as admin', async () => {
         await registry.setFileFlatFee(flatFee, { from: currentFeeAdmin });
         await registry.setFileStorageFee(flatFee, { from: currentFeeAdmin });
-        await registry.setTransactionFlatFee(flatFee, { from: currentFeeAdmin });
-        await registry.setTransactionPercentageFee(percentageFee, { from: currentFeeAdmin });
+        await registry.setOrderFlatFee(flatFee, { from: currentFeeAdmin });
+        await registry.setOrderPercentageFee(percentageFee, { from: currentFeeAdmin });
         await registry.setDeveloperFlatFee(flatFee, { from: currentFeeAdmin });
         await registry.setDeveloperPercentageFee(percentageFee, { from: currentFeeAdmin });
 
         (await registry.fileFlatFee.call()).toNumber().should.equal(flatFee);
         (await registry.fileStorageFee.call()).toNumber().should.equal(flatFee);
-        (await registry.transactionFlatFee.call()).toNumber().should.equal(flatFee);
-        (await registry.transactionPercentageFee.call()).toNumber().should.equal(percentageFee);
+        (await registry.orderFlatFee.call()).toNumber().should.equal(flatFee);
+        (await registry.orderPercentageFee.call()).toNumber().should.equal(percentageFee);
         (await registry.developerFlatFee.call()).toNumber().should.equal(flatFee);
         (await registry.developerPercentageFee.call()).toNumber().should.equal(percentageFee);
     });

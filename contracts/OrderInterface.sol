@@ -1,7 +1,7 @@
 pragma solidity 0.4.24;
 
 
-contract TransactionInterface {
+contract OrderInterface {
     function price() public view returns (uint256);
     function fee() public view returns (uint256);
     function cancelPurchase() external;
