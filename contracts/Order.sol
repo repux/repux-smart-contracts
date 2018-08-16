@@ -3,10 +3,10 @@ pragma solidity 0.4.24;
 import "./DataProductInterface.sol";
 import "./Ownable.sol";
 import "./SafeMath.sol";
-import "./TransactionInterface.sol";
+import "./OrderInterface.sol";
 
 
-contract Transaction is Ownable, TransactionInterface {
+contract Order is Ownable, OrderInterface {
     using SafeMath for uint256;
 
     uint8 constant private minScore = 1;

@@ -6,23 +6,23 @@ import "./ERC20.sol";
 import "./Ownable.sol";
 import "./RegistryInterface.sol";
 import "./SafeMath.sol";
-import "./TransactionInterface.sol";
-import "./TransactionFactoryInterface.sol";
+import "./OrderInterface.sol";
+import "./OrderFactoryInterface.sol";
 
 
 contract DataProduct is Ownable, DataProductInterface {
     using AddressArrayRemover for address[];
     using SafeMath for uint256;
 
-    mapping(address => address) private buyersTransactions;
+    mapping(address => address) private buyersOrders;
     address[] private buyersAddresses;
-    address[] private transactionsAddresses;
+    address[] private ordersAddresses;
 
     address private registryAddress;
     RegistryInterface private registry;
 
-    address private transactionFactoryAddress;
-    TransactionFactoryInterface private transactionFactory;
+    address private orderFactoryAddress;
+    OrderFactoryInterface private orderFactory;
 
     address private tokenAddress;
     ERC20 private token;
@@ -41,7 +41,7 @@ contract DataProduct is Ownable, DataProductInterface {
     bool public kyc = false;
 
     modifier onlyBuyer() {
-        require(buyersTransactions[msg.sender] != address(0));
+        require(buyersOrders[msg.sender] != address(0));
         _;
     }
 
@@ -59,7 +59,7 @@ contract DataProduct is Ownable, DataProductInterface {
 
     constructor(
         address _registryAddress,
-        address _transactionFactoryAddress,
+        address _orderFactoryAddress,
         address _owner,
         address _tokenAddress,
         string _sellerMetaHash,
@@ -71,10 +71,10 @@ contract DataProduct is Ownable, DataProductInterface {
         registryAddress = _registryAddress;
         registry = RegistryInterface(registryAddress);
 
-        require(_price > registry.getTransactionFee(_price), "Price should be greater than transaction fee value");
+        require(_price > registry.getOrderFee(_price), "Price should be greater than order fee value");
 
-        transactionFactoryAddress = _transactionFactoryAddress;
-        transactionFactory = TransactionFactoryInterface(transactionFactoryAddress);
+        orderFactoryAddress = _orderFactoryAddress;
+        orderFactory = OrderFactoryInterface(orderFactoryAddress);
 
         owner = _owner;
         tokenAddress = _tokenAddress;
@@ -118,10 +118,10 @@ contract DataProduct is Ownable, DataProductInterface {
     (
         address
     ) {
-        require(buyersTransactions[_buyerAddress] == address(0));
+        require(buyersOrders[_buyerAddress] == address(0));
 
-        uint256 fee = registry.getTransactionFee(price);
-        address transactionAddress = transactionFactory.createTransaction(
+        uint256 fee = registry.getOrderFee(price);
+        address orderAddress = orderFactory.createOrder(
             owner,
             _buyerAddress,
             _buyerPublicKey,
@@ -131,9 +131,9 @@ contract DataProduct is Ownable, DataProductInterface {
             fee
         );
 
-        buyersTransactions[_buyerAddress] = transactionAddress;
+        buyersOrders[_buyerAddress] = orderAddress;
         buyersAddresses.push(_buyerAddress);
-        transactionsAddresses.push(transactionAddress);
+        ordersAddresses.push(orderAddress);
 
         assert(token.transferFrom(msg.sender, this, price));
 
@@ -141,7 +141,7 @@ contract DataProduct is Ownable, DataProductInterface {
 
         registry.registerPurchase(_buyerAddress);
 
-        return transactionAddress;
+        return orderAddress;
     }
 
     function purchase(string publicKey) public isKycRequired onlyEnabled returns (address) {
@@ -149,45 +149,45 @@ contract DataProduct is Ownable, DataProductInterface {
     }
 
     function cancelPurchase() public onlyBuyer {
-        TransactionInterface transaction = TransactionInterface(buyersTransactions[msg.sender]);
+        OrderInterface order = OrderInterface(buyersOrders[msg.sender]);
 
-        uint256 transactionPrice = transaction.price();
-        transaction.cancelPurchase();
+        uint256 orderPrice = order.price();
+        order.cancelPurchase();
 
-        deleteTransaction();
-        assert(token.transfer(msg.sender, transactionPrice));
+        deleteOrder();
+        assert(token.transfer(msg.sender, orderPrice));
 
-        buyersDeposit = buyersDeposit.sub(transactionPrice);
+        buyersDeposit = buyersDeposit.sub(orderPrice);
 
         registry.registerCancelPurchase(msg.sender);
     }
 
-    function deleteTransaction() private {
+    function deleteOrder() private {
         buyersAddresses.removeByValue(msg.sender);
-        transactionsAddresses.removeByValue(buyersTransactions[msg.sender]);
+        ordersAddresses.removeByValue(buyersOrders[msg.sender]);
 
-        delete buyersTransactions[msg.sender];
+        delete buyersOrders[msg.sender];
     }
 
     function finalise(address _buyerAddress, string _buyerMetaHash) public onlyOwner onlyEnabled {
-        require(buyersTransactions[_buyerAddress] != address(0));
+        require(buyersOrders[_buyerAddress] != address(0));
 
-        TransactionInterface transaction = TransactionInterface(buyersTransactions[_buyerAddress]);
-        transaction.finalise(_buyerMetaHash);
-        uint256 transactionFee = transaction.fee();
+        OrderInterface order = OrderInterface(buyersOrders[_buyerAddress]);
+        order.finalise(_buyerMetaHash);
+        uint256 orderFee = order.fee();
 
-        if (transactionFee > 0) {
-            assert(token.transfer(registryAddress, transactionFee));
+        if (orderFee > 0) {
+            assert(token.transfer(registryAddress, orderFee));
         }
 
-        buyersDeposit = buyersDeposit.sub(transaction.price());
+        buyersDeposit = buyersDeposit.sub(order.price());
 
         registry.registerFinalise(_buyerAddress);
     }
 
     function rate(uint8 score) public onlyBuyer onlyEnabled {
-        TransactionInterface transaction = TransactionInterface(buyersTransactions[msg.sender]);
-        transaction.rate(score);
+        OrderInterface order = OrderInterface(buyersOrders[msg.sender]);
+        order.rate(score);
 
         rateCount = rateCount.add(1);
         scoreCount[score] = scoreCount[score].add(1);
@@ -208,7 +208,7 @@ contract DataProduct is Ownable, DataProductInterface {
     }
 
     function setPrice(uint256 newPrice) public onlyOwner onlyEnabled {
-        require(newPrice > registry.getTransactionFee(newPrice), "Price should be greater than transaction fee value");
+        require(newPrice > registry.getOrderFee(newPrice), "Price should be greater than order fee value");
 
         price = newPrice;
 
@@ -239,19 +239,19 @@ contract DataProduct is Ownable, DataProductInterface {
         registry.registerUpdate(msg.sender);
     }
 
-    function getTransactionFor(address _address) public view returns (address) {
-        return buyersTransactions[_address];
+    function getOrderFor(address _address) public view returns (address) {
+        return buyersOrders[_address];
     }
 
-    function getTransaction() public view returns (address) {
-        return getTransactionFor(msg.sender);
+    function getOrder() public view returns (address) {
+        return getOrderFor(msg.sender);
     }
 
     function getBuyersAddresses() public view returns (address[]) {
         return buyersAddresses;
     }
 
-    function getTransactionsAddresses() public view returns (address[]) {
-        return transactionsAddresses;
+    function getOrdersAddresses() public view returns (address[]) {
+        return ordersAddresses;
     }
 }
