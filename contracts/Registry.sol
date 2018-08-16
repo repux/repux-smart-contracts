@@ -20,7 +20,7 @@ contract Registry is RegistryInterface, Feeable {
     address private dataProductFactoryAddress;
     DataProductFactoryInterface private dataProductFactory;
 
-    address private transactionFactoryAddress;
+    address private orderFactoryAddress;
 
     address[] private dataProducts;
     mapping(address => address[]) private dataCreated;
@@ -41,13 +41,13 @@ contract Registry is RegistryInterface, Feeable {
         _;
     }
 
-    constructor(address _tokenAddress, address _dataProductFactoryAddress, address _transactionFactoryAddress) public {
+    constructor(address _tokenAddress, address _dataProductFactoryAddress, address _orderFactoryAddress) public {
         owner = msg.sender;
         tokenAddress = _tokenAddress;
         token = ERC20(tokenAddress);
         dataProductFactoryAddress = _dataProductFactoryAddress;
         dataProductFactory = DataProductFactoryInterface(dataProductFactoryAddress);
-        transactionFactoryAddress = _transactionFactoryAddress;
+        orderFactoryAddress = _orderFactoryAddress;
     }
 
     function withdraw() public onlyOwner {
@@ -73,7 +73,7 @@ contract Registry is RegistryInterface, Feeable {
 
     function createDataProduct(string _sellerMetaHash, uint256 _price, uint8 _daysToDeliver) public returns (address) {
         address newDataProduct = dataProductFactory.createDataProduct(
-            transactionFactoryAddress,
+            orderFactoryAddress,
             msg.sender,
             tokenAddress,
             _sellerMetaHash,

@@ -2,7 +2,7 @@ const AddressArrayRemover = artifacts.require('./AddressArrayRemover.sol');
 const DemoToken = artifacts.require('./DemoToken.sol');
 const DataProductFactory = artifacts.require('./DataProductFactory.sol');
 const Registry = artifacts.require('./Registry.sol');
-const TransactionFactory = artifacts.require('./TransactionFactory.sol');
+const TransactionFactory = artifacts.require('./OrderFactory.sol');
 
 async function deploy(deployer, network, accounts) {
     let dataProductFactory, transactionFactory;
