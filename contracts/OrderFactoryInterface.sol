@@ -1,8 +1,8 @@
 pragma solidity 0.4.24;
 
 
-contract TransactionFactoryInterface {
-    function createTransaction(
+contract OrderFactoryInterface {
+    function createOrder(
         address _owner,
         address _buyerAddress,
         string _buyerPublicKey,

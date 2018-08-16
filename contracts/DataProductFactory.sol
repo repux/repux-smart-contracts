@@ -22,7 +22,7 @@ contract DataProductFactory is Ownable, DataProductFactoryInterface {
     }
 
     function createDataProduct(
-        address _transactionFactoryAddress,
+        address _orderFactoryAddress,
         address _owner,
         address _tokenAddress,
         string _sellerMetaHash,
@@ -37,7 +37,7 @@ contract DataProductFactory is Ownable, DataProductFactoryInterface {
     ) {
         return new DataProduct(
             msg.sender,
-            _transactionFactoryAddress,
+            _orderFactoryAddress,
             _owner,
             _tokenAddress,
             _sellerMetaHash,
