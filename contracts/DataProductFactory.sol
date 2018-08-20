@@ -1,11 +1,12 @@
-pragma solidity 0.4.24;
+pragma solidity ^0.4.24;
 
 import "./DataProduct.sol";
-import "./DataProductFactoryInterface.sol";
-import "./Ownable.sol";
+import "./interface/DataProductFactoryInterface.sol";
+import "./utils/Ownable.sol";
+import "./utils/Versionable.sol";
 
 
-contract DataProductFactory is Ownable, DataProductFactoryInterface {
+contract DataProductFactory is Ownable, Versionable, DataProductFactoryInterface {
     address public registryAddress;
 
     modifier onlyRegistry() {
@@ -15,6 +16,7 @@ contract DataProductFactory is Ownable, DataProductFactoryInterface {
 
     constructor() public {
         owner = msg.sender;
+        version = 1;
     }
 
     function setRegistry(address _registryAddress) public onlyOwner {
@@ -42,7 +44,8 @@ contract DataProductFactory is Ownable, DataProductFactoryInterface {
             _tokenAddress,
             _sellerMetaHash,
             _price,
-            _daysToDeliver
+            _daysToDeliver,
+            version
         );
     }
 }

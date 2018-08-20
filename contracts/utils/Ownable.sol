@@ -8,12 +8,12 @@ contract Ownable {
     event OwnerTransfer(address originalOwner, address currentOwner);
 
     modifier onlyOwner {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "Cannot call method restricted to owner only");
         _;
     }
 
     function proposeNewOwner(address newOwner) public onlyOwner {
-        require(newOwner != address(0) && newOwner != owner);
+        require(newOwner != address(0) && newOwner != owner, "Invalid address");
         ownerCandidate = newOwner;
     }
 

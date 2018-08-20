@@ -2,7 +2,7 @@ pragma solidity ^0.4.24;
 
 import "./ERC20.sol";
 import "./ERC20Basic.sol";
-import "./SafeMath.sol";
+import "../utils/SafeMath.sol";
 
 
 contract BasicToken is ERC20Basic {

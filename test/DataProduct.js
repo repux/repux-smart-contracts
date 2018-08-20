@@ -1,5 +1,6 @@
 const DataProduct = artifacts.require('./DataProduct.sol');
 const Registry = artifacts.require('./Registry.sol');
+const RegistryStorage = artifacts.require('./RegistryStorage.sol');
 const RepuX = artifacts.require('./DemoToken.sol');
 const Order = artifacts.require('./Order.sol');
 
@@ -7,7 +8,7 @@ const should = require('chai').should();
 const expectThrow = require('./helpers/expectThrow');
 
 contract('DataProduct', (accounts) => {
-    let registry, repux, sellerBalance, fee;
+    let registry, registryAddress, registryStorage, repux, sellerBalance, fee;
 
     const seller = accounts[0];
     const firstBuyer = accounts[1];
@@ -22,11 +23,13 @@ contract('DataProduct', (accounts) => {
     const buyerMetaHash = 'buyerMetaHash';
 
     before(async () => {
-        registry = await Registry.deployed();
+        registryStorage = await RegistryStorage.deployed();
+        registryAddress = await registryStorage.getCurrentRegistryAddress();
+        registry = await Registry.at(registryAddress);
         repux = await RepuX.deployed();
         sellerBalance = (await repux.balanceOf.call(seller)).toNumber();
 
-        repux.issue(firstBuyer, buyerBalance);
+        await repux.issue(firstBuyer, buyerBalance);
 
         (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal(buyerBalance);
 

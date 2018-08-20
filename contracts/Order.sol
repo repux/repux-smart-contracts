@@ -1,12 +1,13 @@
-pragma solidity 0.4.24;
+pragma solidity ^0.4.24;
 
-import "./DataProductInterface.sol";
-import "./Ownable.sol";
-import "./SafeMath.sol";
-import "./OrderInterface.sol";
+import "./interface/DataProductInterface.sol";
+import "./interface/OrderInterface.sol";
+import "./utils/Ownable.sol";
+import "./utils/SafeMath.sol";
+import "./utils/Versionable.sol";
 
 
-contract Order is Ownable, OrderInterface {
+contract Order is Ownable, Versionable, OrderInterface {
     using SafeMath for uint256;
 
     uint8 constant private minScore = 1;
@@ -46,7 +47,8 @@ contract Order is Ownable, OrderInterface {
         uint256 _rateDeadline,
         uint256 _deliveryDeadline,
         uint256 _price,
-        uint256 _fee
+        uint256 _fee,
+        uint16 _version
     )
         public
     {
@@ -65,6 +67,7 @@ contract Order is Ownable, OrderInterface {
         fee = _fee;
         purchased = true;
 
+        version = _version;
         creationTimeStamp = now;
     }
 
