@@ -1,6 +1,6 @@
 pragma solidity ^0.4.24;
 
 
-contract FeeableInterface {
+contract FeeStakesInterface {
     function getOrderFee(uint256 price) public view returns (uint256);
 }

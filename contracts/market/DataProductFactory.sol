@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
 import "./DataProduct.sol";
-import "./interface/DataProductFactoryInterface.sol";
-import "./utils/Ownable.sol";
-import "./utils/Versionable.sol";
+import "../interface/DataProductFactoryInterface.sol";
+import "../utils/Ownable.sol";
+import "../utils/Versionable.sol";
 
 
 contract DataProductFactory is Ownable, Versionable, DataProductFactoryInterface {
@@ -24,6 +24,7 @@ contract DataProductFactory is Ownable, Versionable, DataProductFactoryInterface
     }
 
     function createDataProduct(
+        address _feeStakesAddress,
         address _orderFactoryAddress,
         address _owner,
         address _tokenAddress,
@@ -39,6 +40,7 @@ contract DataProductFactory is Ownable, Versionable, DataProductFactoryInterface
     ) {
         return new DataProduct(
             msg.sender,
+            _feeStakesAddress,
             _orderFactoryAddress,
             _owner,
             _tokenAddress,

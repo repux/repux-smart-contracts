@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 
-import "./interface/RegistryStorageInterface.sol";
-import "./storage/EternalStorage.sol";
+import "../interface/RegistryStorageInterface.sol";
+import "../storage/EternalStorage.sol";
 
 
 contract RegistryStorage is EternalStorage, RegistryStorageInterface {

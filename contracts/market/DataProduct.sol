@@ -1,14 +1,15 @@
 pragma solidity ^0.4.24;
 
-import "./interface/DataProductInterface.sol";
-import "./interface/OrderInterface.sol";
-import "./interface/OrderFactoryInterface.sol";
-import "./interface/RegistryInterface.sol";
-import "./token/ERC20.sol";
-import "./utils/AddressArrayRemover.sol";
-import "./utils/Ownable.sol";
-import "./utils/SafeMath.sol";
-import "./utils/Versionable.sol";
+import "../interface/DataProductInterface.sol";
+import "../interface/FeeStakesInterface.sol";
+import "../interface/OrderInterface.sol";
+import "../interface/OrderFactoryInterface.sol";
+import "../interface/RegistryInterface.sol";
+import "../token/ERC20.sol";
+import "../utils/AddressArrayRemover.sol";
+import "../utils/Ownable.sol";
+import "../utils/SafeMath.sol";
+import "../utils/Versionable.sol";
 
 
 contract DataProduct is Ownable, Versionable, DataProductInterface {
@@ -18,6 +19,9 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
     mapping(address => address) private buyersOrders;
     address[] private buyersAddresses;
     address[] private ordersAddresses;
+
+    address private feeStakesAddress;
+    FeeStakesInterface private feeStakes;
 
     address private registryAddress;
     RegistryInterface private registry;
@@ -60,6 +64,7 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
 
     constructor(
         address _registryAddress,
+        address _feeStakesAddress,
         address _orderFactoryAddress,
         address _owner,
         address _tokenAddress,
@@ -70,10 +75,13 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
     )
         public
     {
+        feeStakesAddress = _feeStakesAddress;
+        feeStakes = FeeStakesInterface(feeStakesAddress);
+
+        require(_price > feeStakes.getOrderFee(_price), "Price should be greater than order fee value");
+
         registryAddress = _registryAddress;
         registry = RegistryInterface(registryAddress);
-
-        require(_price > registry.getOrderFee(_price), "Price should be greater than order fee value");
 
         orderFactoryAddress = _orderFactoryAddress;
         orderFactory = OrderFactoryInterface(orderFactoryAddress);
@@ -124,7 +132,7 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
     ) {
         require(buyersOrders[_buyerAddress] == address(0));
 
-        uint256 fee = registry.getOrderFee(price);
+        uint256 fee = feeStakes.getOrderFee(price);
         address orderAddress = orderFactory.createOrder(
             owner,
             _buyerAddress,
@@ -212,7 +220,7 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
     }
 
     function setPrice(uint256 newPrice) public onlyOwner onlyEnabled {
-        require(newPrice > registry.getOrderFee(newPrice), "Price should be greater than order fee value");
+        require(newPrice > feeStakes.getOrderFee(newPrice), "Price should be greater than order fee value");
 
         price = newPrice;
 

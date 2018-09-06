@@ -3,6 +3,7 @@ pragma solidity ^0.4.24;
 
 contract DataProductFactoryInterface {
     function createDataProduct(
+        address _feeStakesAddress,
         address _orderFactoryAddress,
         address _owner,
         address _tokenAddress,

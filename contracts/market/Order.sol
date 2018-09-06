@@ -1,10 +1,10 @@
 pragma solidity ^0.4.24;
 
-import "./interface/DataProductInterface.sol";
-import "./interface/OrderInterface.sol";
-import "./utils/Ownable.sol";
-import "./utils/SafeMath.sol";
-import "./utils/Versionable.sol";
+import "../interface/DataProductInterface.sol";
+import "../interface/OrderInterface.sol";
+import "../utils/Ownable.sol";
+import "../utils/SafeMath.sol";
+import "../utils/Versionable.sol";
 
 
 contract Order is Ownable, Versionable, OrderInterface {

@@ -1,9 +1,7 @@
 pragma solidity ^0.4.24;
 
-import "../utils/FeeableInterface.sol";
 
-
-contract RegistryInterface is FeeableInterface {
+contract RegistryInterface {
     function isDataProduct(address _address) public view returns (bool);
     function deleteDataProduct(address _address) public returns (bool);
     function isIdentifiedCustomer(address _address) public view returns (bool);

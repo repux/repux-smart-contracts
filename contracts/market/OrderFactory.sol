@@ -1,10 +1,10 @@
 pragma solidity ^0.4.24;
 
 import "./Order.sol";
-import "./interface/OrderFactoryInterface.sol";
-import "./interface/RegistryInterface.sol";
-import "./utils/Ownable.sol";
-import "./utils/Versionable.sol";
+import "../interface/OrderFactoryInterface.sol";
+import "../interface/RegistryInterface.sol";
+import "../utils/Ownable.sol";
+import "../utils/Versionable.sol";
 
 
 contract OrderFactory is Ownable, Versionable, OrderFactoryInterface {

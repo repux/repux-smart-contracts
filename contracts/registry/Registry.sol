@@ -1,15 +1,15 @@
 pragma solidity ^0.4.24;
 
-import "./interface/DataProductFactoryInterface.sol";
-import "./interface/RegistryInterface.sol";
-import "./storage/EternalStorageInterface.sol";
-import "./token/ERC20.sol";
-import "./utils/Feeable.sol";
-import "./utils/SafeMath.sol";
-import "./utils/Versionable.sol";
+import "../interface/DataProductFactoryInterface.sol";
+import "../interface/RegistryInterface.sol";
+import "../storage/EternalStorageInterface.sol";
+import "../token/ERC20.sol";
+import "../utils/Ownable.sol";
+import "../utils/SafeMath.sol";
+import "../utils/Versionable.sol";
 
 
-contract Registry is RegistryInterface, Feeable, Versionable {
+contract Registry is RegistryInterface, Ownable, Versionable {
     using SafeMath for uint256;
 
     enum DataProductEventAction { CREATE, UPDATE, DELETE, PURCHASE, CANCEL_PURCHASE, FINALISE, RATE }
@@ -23,6 +23,7 @@ contract Registry is RegistryInterface, Feeable, Versionable {
     address private dataProductFactoryAddress;
     DataProductFactoryInterface private dataProductFactory;
 
+    address private feeStakesAddress;
     address private orderFactoryAddress;
 
     string private dataProductsKey = "dataProducts";
@@ -56,6 +57,7 @@ contract Registry is RegistryInterface, Feeable, Versionable {
         address _storageAddress,
         address _tokenAddress,
         address _dataProductFactoryAddress,
+        address _feeStakesAddress,
         address _orderFactoryAddress,
         uint16 _version
     )
@@ -81,6 +83,7 @@ contract Registry is RegistryInterface, Feeable, Versionable {
         dataProductFactoryAddress = _dataProductFactoryAddress;
         dataProductFactory = DataProductFactoryInterface(dataProductFactoryAddress);
 
+        feeStakesAddress = _feeStakesAddress;
         orderFactoryAddress = _orderFactoryAddress;
     }
 
@@ -118,6 +121,7 @@ contract Registry is RegistryInterface, Feeable, Versionable {
     )
     {
         address newDataProduct = dataProductFactory.createDataProduct(
+            feeStakesAddress,
             orderFactoryAddress,
             msg.sender,
             tokenAddress,

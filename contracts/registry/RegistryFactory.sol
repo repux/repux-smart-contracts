@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
 import "./Registry.sol";
-import "./interface/RegistryStorageInterface.sol";
-import "./utils/Ownable.sol";
-import "./utils/Versionable.sol";
+import "../interface/RegistryStorageInterface.sol";
+import "../utils/Ownable.sol";
+import "../utils/Versionable.sol";
 
 
 contract RegistryFactory is Ownable, Versionable {
@@ -15,7 +15,7 @@ contract RegistryFactory is Ownable, Versionable {
         require(_storageAddress != address(0), "Incorrect storage address");
 
         owner = msg.sender;
-        version = 1;
+        version = 2;
         created = false;
 
         registryStorageAddress = _storageAddress;
@@ -26,6 +26,7 @@ contract RegistryFactory is Ownable, Versionable {
         address _storageAddress,
         address _tokenAddress,
         address _dataProductFactoryAddress,
+        address _feeStakesAddress,
         address _orderFactoryAddress
     )
         public
@@ -41,6 +42,7 @@ contract RegistryFactory is Ownable, Versionable {
             _storageAddress,
             _tokenAddress,
             _dataProductFactoryAddress,
+            _feeStakesAddress,
             _orderFactoryAddress,
             version
         );

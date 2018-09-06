@@ -1,4 +1,6 @@
 const DataProduct = artifacts.require('./DataProduct.sol');
+const FeeStakes = artifacts.require('./FeeStakes.sol');
+const FeeStakesStorage = artifacts.require('./FeeStakesStorage.sol');
 const Registry = artifacts.require('./Registry.sol');
 const RegistryStorage = artifacts.require('./RegistryStorage.sol');
 const RepuX = artifacts.require('./DemoToken.sol');
@@ -8,7 +10,16 @@ const should = require('chai').should();
 const expectThrow = require('./helpers/expectThrow');
 
 contract('DataProduct', (accounts) => {
-    let registry, registryAddress, registryStorage, repux, sellerBalance, fee;
+    let fee,
+        feeStakes,
+        feeStakesAddress,
+        feeStakesStorage,
+        registry,
+        registryAddress,
+        registryStorage,
+        repux,
+        sellerBalance
+    ;
 
     const seller = accounts[0];
     const firstBuyer = accounts[1];
@@ -23,6 +34,9 @@ contract('DataProduct', (accounts) => {
     const buyerMetaHash = 'buyerMetaHash';
 
     before(async () => {
+        feeStakesStorage = await FeeStakesStorage.deployed();
+        feeStakesAddress = await feeStakesStorage.getCurrentFeeStakesAddress();
+        feeStakes = await FeeStakes.at(feeStakesAddress);
         registryStorage = await RegistryStorage.deployed();
         registryAddress = await registryStorage.getCurrentRegistryAddress();
         registry = await Registry.at(registryAddress);
@@ -33,13 +47,13 @@ contract('DataProduct', (accounts) => {
 
         (await repux.balanceOf.call(firstBuyer)).toNumber().should.equal(buyerBalance);
 
-        await registry.proposeNewFeeAdmin(seller);
-        await registry.acceptFeeAdminTransfer();
+        await feeStakes.proposeNewFeeAdmin(seller);
+        await feeStakes.acceptFeeAdminTransfer();
 
-        await registry.setOrderFlatFee(flatFee);
-        await registry.setOrderPercentageFee(percentageFee);
+        await feeStakes.setOrderFlatFee(flatFee);
+        await feeStakes.setOrderPercentageFee(percentageFee);
 
-        fee = (await registry.getOrderFee.call(price)).toNumber();
+        fee = (await feeStakes.getOrderFee.call(price)).toNumber();
     });
 
     it('should go through the whole purchase flow', async () => {
