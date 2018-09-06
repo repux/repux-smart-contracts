@@ -1,4 +1,4 @@
-pragma solidity 0.4.24;
+pragma solidity ^0.4.24;
 
 import "./FeeableInterface.sol";
 import "./Ownable.sol";
@@ -31,7 +31,7 @@ contract Feeable is Ownable, FeeableInterface {
     }
 
     function acceptFeeAdminTransfer() public {
-        require(msg.sender == feeAdminCandidate);
+        require(msg.sender == feeAdminCandidate, "Cannot call method restricted to candidate only");
 
         emit FeeAdminTransfer(feeAdmin, feeAdminCandidate);
         feeAdmin = feeAdminCandidate;

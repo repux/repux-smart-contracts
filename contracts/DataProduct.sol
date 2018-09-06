@@ -1,16 +1,17 @@
-pragma solidity 0.4.24;
+pragma solidity ^0.4.24;
 
-import "./AddressArrayRemover.sol";
-import "./DataProductInterface.sol";
-import "./ERC20.sol";
-import "./Ownable.sol";
-import "./RegistryInterface.sol";
-import "./SafeMath.sol";
-import "./OrderInterface.sol";
-import "./OrderFactoryInterface.sol";
+import "./interface/DataProductInterface.sol";
+import "./interface/OrderInterface.sol";
+import "./interface/OrderFactoryInterface.sol";
+import "./interface/RegistryInterface.sol";
+import "./token/ERC20.sol";
+import "./utils/AddressArrayRemover.sol";
+import "./utils/Ownable.sol";
+import "./utils/SafeMath.sol";
+import "./utils/Versionable.sol";
 
 
-contract DataProduct is Ownable, DataProductInterface {
+contract DataProduct is Ownable, Versionable, DataProductInterface {
     using AddressArrayRemover for address[];
     using SafeMath for uint256;
 
@@ -64,7 +65,8 @@ contract DataProduct is Ownable, DataProductInterface {
         address _tokenAddress,
         string _sellerMetaHash,
         uint256 _price,
-        uint8 _daysToDeliver
+        uint8 _daysToDeliver,
+        uint16 _version
     )
         public
     {
@@ -82,6 +84,8 @@ contract DataProduct is Ownable, DataProductInterface {
         sellerMetaHash = _sellerMetaHash;
         price = _price;
         daysToDeliver = _daysToDeliver;
+
+        version = _version;
         creationTimeStamp = now;
     }
 
