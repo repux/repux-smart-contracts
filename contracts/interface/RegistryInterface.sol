@@ -1,6 +1,6 @@
-pragma solidity 0.4.24;
+pragma solidity ^0.4.24;
 
-import "./FeeableInterface.sol";
+import "../utils/FeeableInterface.sol";
 
 
 contract RegistryInterface is FeeableInterface {

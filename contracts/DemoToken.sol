@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 
-import "./StandardToken.sol";
-import "./Ownable.sol";
+import "./token/StandardToken.sol";
+import "./utils/Ownable.sol";
 
 
 contract DemoToken is StandardToken, Ownable {
