@@ -1,9 +1,10 @@
 pragma solidity ^0.4.24;
 
+import "./interface/RegistryStorageInterface.sol";
 import "./storage/EternalStorage.sol";
 
 
-contract RegistryStorage is EternalStorage {
+contract RegistryStorage is EternalStorage, RegistryStorageInterface {
     function addPrivilegedAddress(address _value) onlyOwner public {
         addressStorage[keccak256(abi.encodePacked("contract.address", _value))] = _value;
     }
