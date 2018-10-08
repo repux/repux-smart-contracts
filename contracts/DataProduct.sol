@@ -58,6 +58,16 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
         _;
     }
 
+    /**
+        @param _registryAddress address of administrative contract
+        @param _orderFactoryAddress address of factory for handling new orders
+        @param _owner address of data product creator
+        @param _tokenAddress address of currency token
+        @param _sellerMetaHash hash to file within IPFS DB with data product meta information
+        @param _price data product price in Repux Token
+        @param _daysToDeliver days period in which seller is obligated to finalise transaction
+        @param _version internal version for contract retrieved from factory
+    */
     constructor(
         address _registryAddress,
         address _orderFactoryAddress,
@@ -111,6 +121,15 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
         registry.registerUpdate(msg.sender);
     }
 
+    /**
+        @notice Make a purchase on behalf of specific buyer address. Data Product Contract receives tokens (price amount)
+                and holds that amount in deposit until order is completed or canceled.
+        @param _buyerAddress buyer address
+        @param _buyerPublicKey a key used for encoding bought file which contains data product
+        @return {
+          "orderAddress": "The contract address to buyer's order"
+        }
+    */
     function purchaseFor(
         address _buyerAddress,
         string _buyerPublicKey
@@ -148,10 +167,21 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
         return orderAddress;
     }
 
+    /**
+        @notice Make a purchase
+        @param publicKey a key used for encoding bought file which contains data product
+        @return {
+          "orderAddress": "The contract address to buyer's order"
+        }
+    */
     function purchase(string publicKey) public isKycRequired onlyEnabled returns (address) {
         return purchaseFor(msg.sender, publicKey);
     }
 
+    /**
+        @notice Canceling of purchase is available after Order delivery period expires and Order is not yet finalised.
+                Returns tokens to buyer and releases tokens from contract deposit by price amount.
+    */
     function cancelPurchase() public onlyBuyer {
         OrderInterface order = OrderInterface(buyersOrders[msg.sender]);
 
@@ -173,6 +203,12 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
         delete buyersOrders[msg.sender];
     }
 
+    /**
+        @notice Perform order finalisation by data product owner. Handles fee transfer to Registry contract and
+                releases tokens from contract deposit by price amount to be available for seller withdrawal.
+        @param _buyerAddress buyer address
+        @param _buyerMetaHash hash to IPFS file containing all necessary data to manage bought file
+    */
     function finalise(address _buyerAddress, string _buyerMetaHash) public onlyOwner onlyEnabled {
         require(buyersOrders[_buyerAddress] != address(0));
 
@@ -189,6 +225,11 @@ contract DataProduct is Ownable, Versionable, DataProductInterface {
         registry.registerFinalise(_buyerAddress);
     }
 
+    /**
+        @notice Perform order rating which is available right after order finalisation. Only buyer and only once has
+                possibility to rate order in given period of time.
+        @param score integer between 1 to 5
+    */
     function rate(uint8 score) public onlyBuyer onlyEnabled {
         OrderInterface order = OrderInterface(buyersOrders[msg.sender]);
         order.rate(score);
