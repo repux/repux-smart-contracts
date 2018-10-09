@@ -1,0 +1,41 @@
+{
+  "docs-api": {
+    "INTERFACE": [
+      "interface_DataProductFactoryInterface",
+      "interface_DataProductInterface",
+      "interface_OrderFactoryInterface",
+      "interface_OrderInterface",
+      "interface_RegistryInterface",
+      "interface_RegistryStorageInterface"
+    ],
+    "STORAGE": [
+      "storage_EternalStorage",
+      "storage_EternalStorageInterface"
+    ],
+    "TOKEN": [
+      "token_ERC20",
+      "token_ERC20Basic",
+      "token_StandardToken",
+      "token_StandardToken_BasicToken"
+    ],
+    "UTILS": [
+      "utils_AddressArrayRemover",
+      "utils_Feeable",
+      "utils_FeeableInterface",
+      "utils_Ownable",
+      "utils_SafeMath",
+      "utils_Versionable"
+    ],
+    "UNCATEGORIZED": [
+      "DataProduct",
+      "DataProductFactory",
+      "DemoToken",
+      "Migrations",
+      "Order",
+      "OrderFactory",
+      "Registry",
+      "RegistryFactory",
+      "RegistryStorage"
+    ]
+  }
+}

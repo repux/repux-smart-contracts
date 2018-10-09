@@ -15,7 +15,8 @@
   "scripts": {
     "test": "truffle test",
     "migrate": "truffle migrate",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "docs": "node_modules/.bin/solidity-docgen ./ ./contracts ./"
   },
   "devDependencies": {
     "@semantic-release/git": "^5.0.0",
@@ -24,6 +25,7 @@
     "chai": "^4.1.2",
     "mocha": "^4.0.1",
     "semantic-release": "^15.4.0",
+    "solidity-docgen": "^0.1.0",
     "solidity-sha3": "0.4.1"
   },
   "dependencies": {
