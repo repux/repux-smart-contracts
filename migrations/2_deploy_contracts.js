@@ -1,4 +1,5 @@
 const AddressArrayRemover = artifacts.require('./utils/AddressArrayRemover.sol');
+const AliasList = artifacts.require('./AliasList.sol');
 const DataProductFactory = artifacts.require('./DataProductFactory.sol');
 const DemoToken = artifacts.require('./DemoToken.sol');
 const OrderFactory = artifacts.require('./OrderFactory.sol');
@@ -10,6 +11,7 @@ async function deploy(deployer, network, accounts) {
 
     await deployer.deploy(AddressArrayRemover);
     await deployer.link(AddressArrayRemover, [RegistryStorage, DataProductFactory]);
+    await deployer.deploy(AliasList);
 
     let demoTokenAddress = '0xfa19d4e302336d61b895ea3b26bf4864bdd1d8ab';
     if (network !== 'rinkeby') {
